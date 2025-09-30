@@ -1,0 +1,39 @@
+# Production environment configuration
+# Following FIT-RS2-2025 eCommerce pattern
+
+version: '3.8'
+
+services:
+  database:
+    environment:
+      MSSQL_PID: "Standard"
+    restart: always
+    volumes:
+      - database_data_prod:/var/opt/mssql
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+
+  api:
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Production"
+      ASPNETCORE_URLS: "http://+:8080"
+      ASPNETCORE_LOGGING__LOGLEVEL__DEFAULT: "Warning"
+      ASPNETCORE_LOGGING__LOGLEVEL__MICROSOFT: "Error"
+    restart: always
+    volumes:
+      - app_logs_prod:/app/logs
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+      replicas: 2
+
+volumes:
+  database_data_prod:
+  app_logs_prod:
