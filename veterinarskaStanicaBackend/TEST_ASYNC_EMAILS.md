@@ -249,3 +249,17 @@ Asinhroni emailovi rade ako:
 **Ako sve ovo radi - vaši asinhroni emailovi su uspešno implementirani! 🎉**
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -35,13 +35,15 @@ namespace eVeterinarskaStanicaModel
         public string? PetSpecies { get; set; }
 
         // Foreign Keys
-        public int ServiceId { get; set; }
-        public int UserId { get; set; }
+        public int? ServiceId { get; set; } // Optional - može biti review za Service
+        public int? VeterinarianId { get; set; } // Optional - može biti review za Veterinarian
+        public int UserId { get; set; } // Korisnik koji je ostavio review
         public int? OrderId { get; set; }
 
         // Navigation Properties
-        public virtual Service Service { get; set; }
-        public virtual User User { get; set; }
+        public virtual Service? Service { get; set; }
+        public virtual User? Veterinarian { get; set; } // Veterinar koji se ocjenjuje
+        public virtual User User { get; set; } // Korisnik koji je ostavio review
         public virtual Order? Order { get; set; }
     }
 }

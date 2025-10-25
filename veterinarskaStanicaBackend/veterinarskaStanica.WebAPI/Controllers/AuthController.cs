@@ -116,25 +116,60 @@ namespace veterinarskaStanica.WebAPI.Controllers
         /// </summary>
         [HttpGet("me")]
         [Authorize]
-        public ActionResult GetCurrentUser()
+        public async Task<ActionResult> GetCurrentUser()
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            var emailClaim = User.FindFirst(ClaimTypes.Email)?.Value;
-            var roleClaim = User.FindFirst(ClaimTypes.Role)?.Value;
-            var firstNameClaim = User.FindFirst(ClaimTypes.GivenName)?.Value;
-            var lastNameClaim = User.FindFirst(ClaimTypes.Surname)?.Value;
+            if (!int.TryParse(userIdClaim, out int userId))
+            {
+                return BadRequest("Invalid user token");
+            }
 
-            var permissions = User.FindAll("permission").Select(c => c.Value).ToArray();
+            var result = await _authService.GetUserByIdAsync(userId);
+            if (!result.Success)
+            {
+                return NotFound(result.ErrorMessage);
+            }
 
+            var user = result.Data;
             return Ok(new
             {
-                UserId = userIdClaim,
-                Email = emailClaim,
-                Role = roleClaim,
-                FirstName = firstNameClaim,
-                LastName = lastNameClaim,
-                Permissions = permissions
+                id = user.Id,
+                firstName = user.FirstName,
+                lastName = user.LastName,
+                email = user.Email,
+                phoneNumber = user.PhoneNumber,
+                address = user.Address,
+                role = (int)user.Role,
+                isActive = user.IsActive,
+                isEmailVerified = user.IsEmailVerified,
+                // Veterinarian specific fields
+                licenseNumber = user.LicenseNumber,
+                specialization = user.Specialization,
+                yearsOfExperience = user.YearsOfExperience,
+                biography = user.Biography
             });
+        }
+
+        /// <summary>
+        /// Update current user profile
+        /// </summary>
+        [HttpPut("me")]
+        [Authorize]
+        public async Task<ActionResult> UpdateCurrentUser([FromBody] UpdateProfileRequest request)
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!int.TryParse(userIdClaim, out int userId))
+            {
+                return BadRequest("Invalid user token");
+            }
+
+            var result = await _authService.UpdateUserProfileAsync(userId, request);
+            if (!result.Success)
+            {
+                return BadRequest(result.ErrorMessage);
+            }
+
+            return Ok(new { message = "Profile updated successfully" });
         }
 
         /// <summary>
@@ -230,7 +265,10 @@ namespace veterinarskaStanica.WebAPI.Controllers
             
             if (result.Success)
             {
-                return Ok(new { message = "Registration successful! Please check your email for verification code." });
+                return Ok(new { 
+                    message = result.Data.Message,
+                    id = result.Data.UserId
+                });
             }
 
             return BadRequest(new { message = result.ErrorMessage });

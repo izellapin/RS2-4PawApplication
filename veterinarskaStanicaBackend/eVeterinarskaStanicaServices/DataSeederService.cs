@@ -34,6 +34,9 @@ namespace eVeterinarskaStanicaServices
                 await SeedAdminUserAsync();
                 await SeedCategoriesAsync();
                 await SeedServicesAsync();
+                
+                // Seed test data for appointments and pets
+                await SeedTestDataAsync();
 
                 _logger.LogInformation("Initial data seeding completed successfully");
             }
@@ -145,61 +148,70 @@ namespace eVeterinarskaStanicaServices
         {
             try
             {
-                // Check if categories already exist
+                // Clear existing services first to avoid foreign key constraint issues
+                if (await _context.Services.AnyAsync())
+                {
+                    _logger.LogInformation("Clearing existing services to update with new data");
+                    _context.Services.RemoveRange(_context.Services);
+                    await _context.SaveChangesAsync();
+                }
+
+                // Clear existing categories to update with new data
                 if (await _context.Categories.AnyAsync())
                 {
-                    _logger.LogInformation("Categories already exist, skipping category seeding");
-                    return;
+                    _logger.LogInformation("Clearing existing categories to update with new data");
+                    _context.Categories.RemoveRange(_context.Categories);
+                    await _context.SaveChangesAsync();
                 }
 
                 var categories = new[]
                 {
                     new Category
                     {
-                        Name = "Wellness & Prevention",
-                        Description = "Preventive care and wellness services",
-                        CategoryType = "Medical",
-                        TargetSpecies = "All",
+                        Name = "Prevencija i zdravlje",
+                        Description = "Preventivna njega i zdravstvene usluge",
+                        CategoryType = "Medicinski",
+                        TargetSpecies = "Svi",
                         IsActive = true,
                         DateCreated = DateTime.UtcNow,
                         SortOrder = 1
                     },
                     new Category
                     {
-                        Name = "Emergency Care",
-                        Description = "Emergency and urgent care services",
-                        CategoryType = "Emergency",
-                        TargetSpecies = "All",
+                        Name = "Hitna pomoć",
+                        Description = "Hitne i urgentne veterinarske usluge",
+                        CategoryType = "Hitno",
+                        TargetSpecies = "Svi",
                         IsActive = true,
                         DateCreated = DateTime.UtcNow,
                         SortOrder = 2
                     },
                     new Category
                     {
-                        Name = "Surgery",
-                        Description = "Surgical procedures and operations",
-                        CategoryType = "Surgical",
-                        TargetSpecies = "All",
+                        Name = "Hirurgija",
+                        Description = "Hirurški zahvati i operacije",
+                        CategoryType = "Hirurški",
+                        TargetSpecies = "Svi",
                         IsActive = true,
                         DateCreated = DateTime.UtcNow,
                         SortOrder = 3
                     },
                     new Category
                     {
-                        Name = "Dental Care",
-                        Description = "Dental cleaning and oral health services",
-                        CategoryType = "Medical",
-                        TargetSpecies = "All",
+                        Name = "Stomatologija",
+                        Description = "Čišćenje zuba i usluge oralnog zdravlja",
+                        CategoryType = "Medicinski",
+                        TargetSpecies = "Svi",
                         IsActive = true,
                         DateCreated = DateTime.UtcNow,
                         SortOrder = 4
                     },
                     new Category
                     {
-                        Name = "Grooming",
-                        Description = "Pet grooming and hygiene services",
-                        CategoryType = "Grooming",
-                        TargetSpecies = "All",
+                        Name = "Čišćenje",
+                        Description = "Čišćenje ljubimaca i higijenske usluge",
+                        CategoryType = "Čišćenje",
+                        TargetSpecies = "Svi",
                         IsActive = true,
                         DateCreated = DateTime.UtcNow,
                         SortOrder = 5
@@ -222,19 +234,14 @@ namespace eVeterinarskaStanicaServices
         {
             try
             {
-                // Check if services already exist
-                if (await _context.Services.AnyAsync())
-                {
-                    _logger.LogInformation("Services already exist, skipping service seeding");
-                    return;
-                }
+                // Services are already cleared in SeedCategoriesAsync
 
                 // Get categories for foreign key references (use FirstOrDefault to avoid crashes)
-                var wellnessCategory = await _context.Categories.FirstOrDefaultAsync(c => c.Name == "Wellness & Prevention");
-                var emergencyCategory = await _context.Categories.FirstOrDefaultAsync(c => c.Name == "Emergency Care");
-                var surgeryCategory = await _context.Categories.FirstOrDefaultAsync(c => c.Name == "Surgery");
-                var dentalCategory = await _context.Categories.FirstOrDefaultAsync(c => c.Name == "Dental Care");
-                var groomingCategory = await _context.Categories.FirstOrDefaultAsync(c => c.Name == "Grooming");
+                var wellnessCategory = await _context.Categories.FirstOrDefaultAsync(c => c.Name == "Prevencija i zdravlje");
+                var emergencyCategory = await _context.Categories.FirstOrDefaultAsync(c => c.Name == "Hitna pomoć");
+                var surgeryCategory = await _context.Categories.FirstOrDefaultAsync(c => c.Name == "Hirurgija");
+                var dentalCategory = await _context.Categories.FirstOrDefaultAsync(c => c.Name == "Stomatologija");
+                var groomingCategory = await _context.Categories.FirstOrDefaultAsync(c => c.Name == "Čišćenje");
 
                 // If categories don't exist, use the first available category or create a default one
                 var defaultCategory = wellnessCategory ?? emergencyCategory ?? surgeryCategory ?? dentalCategory ?? groomingCategory;
@@ -261,30 +268,30 @@ namespace eVeterinarskaStanicaServices
                     // Wellness services
                     new Service
                     {
-                        Name = "Annual Wellness Exam",
+                        Name = "Godišnji pregled",
                         Code = "WELLNESS-001",
-                        Description = "Comprehensive annual health examination for your pet",
-                        ShortDescription = "Complete health checkup",
+                        Description = "Sveobuhvatan godišnji zdravstveni pregled vašeg ljubimca",
+                        ShortDescription = "Kompletni zdravstveni pregled",
                         Price = 75.00m,
                         DurationMinutes = 45,
                         RequiresAppointment = true,
-                        ServiceType = "Wellness Exam",
-                        AgeGroup = "All",
+                        ServiceType = "Pregled",
+                        AgeGroup = "Svi",
                         CategoryId = wellnessCategory.Id,
                         IsActive = true,
                         DateCreated = DateTime.UtcNow
                     },
                     new Service
                     {
-                        Name = "Vaccination Package",
+                        Name = "Vakcinacija",
                         Code = "WELLNESS-002",
-                        Description = "Essential vaccinations to protect your pet from diseases",
-                        ShortDescription = "Core vaccinations",
+                        Description = "Osnovne vakcine za zaštitu vašeg ljubimca od bolesti",
+                        ShortDescription = "Osnovne vakcine",
                         Price = 120.00m,
                         DurationMinutes = 30,
                         RequiresAppointment = true,
-                        ServiceType = "Vaccination",
-                        AgeGroup = "All",
+                        ServiceType = "Vakcinacija",
+                        AgeGroup = "Svi",
                         CategoryId = wellnessCategory.Id,
                         IsActive = true,
                         DateCreated = DateTime.UtcNow
@@ -292,15 +299,15 @@ namespace eVeterinarskaStanicaServices
                     // Emergency services
                     new Service
                     {
-                        Name = "Emergency Consultation",
+                        Name = "Hitna pomoć",
                         Code = "EMERGENCY-001",
-                        Description = "Urgent medical consultation for emergency situations",
-                        ShortDescription = "Emergency care",
+                        Description = "Hitna veterinarska konsultacija za urgentne slučajeve",
+                        ShortDescription = "Hitna veterinarska pomoć",
                         Price = 150.00m,
                         DurationMinutes = 60,
                         RequiresAppointment = false,
-                        ServiceType = "Emergency",
-                        AgeGroup = "All",
+                        ServiceType = "Hitno",
+                        AgeGroup = "Svi",
                         CategoryId = emergencyCategory.Id,
                         IsActive = true,
                         DateCreated = DateTime.UtcNow
@@ -308,18 +315,18 @@ namespace eVeterinarskaStanicaServices
                     // Surgery services
                     new Service
                     {
-                        Name = "Spay/Neuter Surgery",
+                        Name = "Sterilizacija",
                         Code = "SURGERY-001",
-                        Description = "Surgical sterilization procedure",
-                        ShortDescription = "Spay/Neuter operation",
+                        Description = "Hirurška sterilizacija ljubimca",
+                        ShortDescription = "Operacija sterilizacije",
                         Price = 300.00m,
                         DurationMinutes = 120,
                         RequiresAppointment = true,
                         RequiresFasting = true,
-                        ServiceType = "Surgery",
-                        AgeGroup = "Adult",
-                        PreparationInstructions = "Fast for 12 hours before surgery",
-                        PostCareInstructions = "Keep incision dry and monitor for 10-14 days",
+                        ServiceType = "Hirurgija",
+                        AgeGroup = "Odrasli",
+                        PreparationInstructions = "Gladovanje 12 sati prije operacije",
+                        PostCareInstructions = "Držati rez suvim i pratiti 10-14 dana",
                         CategoryId = surgeryCategory.Id,
                         IsActive = true,
                         DateCreated = DateTime.UtcNow
@@ -327,17 +334,17 @@ namespace eVeterinarskaStanicaServices
                     // Dental services
                     new Service
                     {
-                        Name = "Dental Cleaning",
+                        Name = "Čišćenje zuba",
                         Code = "DENTAL-001",
-                        Description = "Professional dental cleaning and oral health assessment",
-                        ShortDescription = "Teeth cleaning",
+                        Description = "Profesionalno čišćenje zuba i procjena oralnog zdravlja",
+                        ShortDescription = "Čišćenje zuba",
                         Price = 200.00m,
                         DurationMinutes = 90,
                         RequiresAppointment = true,
                         RequiresFasting = true,
-                        ServiceType = "Dental",
-                        AgeGroup = "Adult",
-                        PreparationInstructions = "Fast for 8 hours before procedure",
+                        ServiceType = "Stomatologija",
+                        AgeGroup = "Odrasli",
+                        PreparationInstructions = "Gladovanje 8 sati prije procedure",
                         CategoryId = dentalCategory.Id,
                         IsActive = true,
                         DateCreated = DateTime.UtcNow
@@ -345,15 +352,15 @@ namespace eVeterinarskaStanicaServices
                     // Grooming services
                     new Service
                     {
-                        Name = "Full Grooming Package",
+                        Name = "Kompletno čišćenje",
                         Code = "GROOMING-001",
-                        Description = "Complete grooming service including bath, nail trim, and styling",
-                        ShortDescription = "Full grooming",
+                        Description = "Kompletna usluga čišćenja uključujući kupanje, šišanje noktiju i stilizovanje",
+                        ShortDescription = "Kompletno čišćenje",
                         Price = 80.00m,
                         DurationMinutes = 120,
                         RequiresAppointment = true,
-                        ServiceType = "Grooming",
-                        AgeGroup = "All",
+                        ServiceType = "Čišćenje",
+                        AgeGroup = "Svi",
                         CategoryId = groomingCategory.Id,
                         IsActive = true,
                         DateCreated = DateTime.UtcNow
@@ -368,6 +375,119 @@ namespace eVeterinarskaStanicaServices
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error seeding services");
+                throw;
+            }
+        }
+
+        public async Task SeedTestDataAsync()
+        {
+            try
+            {
+                _logger.LogInformation("Seeding test data...");
+
+                // Get admin user (veterinarian)
+                var adminUser = await _context.Users.FirstOrDefaultAsync(u => u.Role == UserRole.Admin);
+                if (adminUser == null)
+                {
+                    _logger.LogWarning("Admin user not found, skipping test data seeding");
+                    return;
+                }
+
+                // Create a test pet owner
+                var testOwner = await _context.Users.FirstOrDefaultAsync(u => u.Email == "testowner@test.com");
+                if (testOwner == null)
+                {
+                    byte[] salt;
+                    var hash = _hashingService.HashPassword("test123", out salt);
+                    
+                    testOwner = new User
+                    {
+                        FirstName = "Marko",
+                        LastName = "Petrović",
+                        Email = "testowner@test.com",
+                        Username = "testowner",
+                        PhoneNumber = "+381601234567",
+                        PasswordHash = hash,
+                        PasswordSalt = Convert.ToBase64String(salt),
+                        Role = UserRole.PetOwner,
+                        IsActive = true,
+                        DateCreated = DateTime.UtcNow
+                    };
+                    _context.Users.Add(testOwner);
+                    await _context.SaveChangesAsync();
+                    _logger.LogInformation($"Created test owner with ID: {testOwner.Id}");
+                }
+                else
+                {
+                    _logger.LogInformation($"Test owner already exists with ID: {testOwner.Id}");
+                }
+
+                // Create a test pet
+                var testPet = await _context.Pets.FirstOrDefaultAsync(p => p.Name == "Rex");
+                if (testPet == null)
+                {
+                    _logger.LogInformation($"Creating Rex pet for owner ID: {testOwner.Id}");
+                    testPet = new Pet
+                    {
+                        Name = "Rex",
+                        Species = "Pas",
+                        Breed = "Nemački ovčar",
+                        Gender = PetGender.Male,
+                        DateOfBirth = DateTime.UtcNow.AddYears(-3),
+                        Color = "Crn",
+                        Weight = 35.5m,
+                        MicrochipNumber = "123456789012345",
+                        Status = PetStatus.Active,
+                        Notes = "Test pas za demonstraciju",
+                        DateCreated = DateTime.UtcNow,
+                        PetOwnerId = testOwner.Id
+                    };
+                    _context.Pets.Add(testPet);
+                    await _context.SaveChangesAsync();
+                    _logger.LogInformation($"Rex pet created successfully with ID: {testPet.Id}");
+                }
+                else
+                {
+                    _logger.LogInformation($"Rex pet already exists with ID: {testPet.Id}, Owner ID: {testPet.PetOwnerId}");
+                    // Ensure Rex is Active - force update
+                    testPet.Status = PetStatus.Active;
+                    await _context.SaveChangesAsync();
+                    _logger.LogInformation($"Force updated Rex status to Active");
+                }
+
+                // Create a test appointment for today
+                var today = DateTime.Today;
+                var existingAppointment = await _context.Appointments
+                    .FirstOrDefaultAsync(a => a.PetId == testPet.Id && a.AppointmentDate.Date == today);
+                
+                if (existingAppointment == null)
+                {
+                    var testAppointment = new Appointment
+                    {
+                        AppointmentNumber = $"APT-{DateTime.Now:yyyyMMdd}-001",
+                        AppointmentDate = today,
+                        StartTime = new TimeSpan(10, 0, 0), // 10:00
+                        EndTime = new TimeSpan(11, 0, 0),   // 11:00
+                        Type = AppointmentType.Checkup,
+                        Status = AppointmentStatus.Confirmed,
+                        Reason = "Redovni pregled",
+                        Notes = "Test termin za demonstraciju",
+                        EstimatedCost = 2500.00m,
+                        DateCreated = DateTime.UtcNow,
+                        PetId = testPet.Id,
+                        VeterinarianId = adminUser.Id
+                    };
+                    _context.Appointments.Add(testAppointment);
+                    await _context.SaveChangesAsync();
+                    
+                    _logger.LogInformation("Test appointment created successfully");
+                }
+
+                _logger.LogInformation("Test data seeding completed successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error seeding test data");
                 throw;
             }
         }

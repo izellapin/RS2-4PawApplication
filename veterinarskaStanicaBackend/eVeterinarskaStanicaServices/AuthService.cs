@@ -59,6 +59,71 @@ namespace eVeterinarskaStanicaServices
                 if (!_hashingService.VerifyPassword(request.Password, user.PasswordHash, user.PasswordSalt))
                     return ServiceResult<AuthResponse>.ErrorResult("Invalid email or password");
 
+                // Send email verification only for mobile users (not for desktop/veterinarians)
+                // Also check if we already sent a verification code recently (within last 5 minutes)
+                var recentCode = await _context.EmailVerificationCodes
+                    .FirstOrDefaultAsync(e => e.UserId == user.Id && 
+                                             !e.IsUsed && 
+                                             e.CreatedAt > DateTime.UtcNow.AddMinutes(-5));
+                
+                var isMobileClient = string.IsNullOrEmpty(request.ClientType) || 
+                                   request.ClientType.Equals("Mobile", StringComparison.OrdinalIgnoreCase);
+                
+                if (!user.IsEmailVerified && user.LastLoginDate == null && recentCode == null && isMobileClient)
+                {
+                    try
+                    {
+                        var verificationCode = GenerateEmailVerificationCode();
+                        var expirationMinutes = int.Parse(_configuration["EmailVerification:CodeExpirationMinutes"] ?? "30");
+                        var expiresAt = DateTime.UtcNow.AddMinutes(expirationMinutes);
+
+                        // Check if verification code already exists
+                        var existingCode = await _context.EmailVerificationCodes
+                            .FirstOrDefaultAsync(e => e.UserId == user.Id && !e.IsUsed);
+
+                        if (existingCode != null)
+                        {
+                            // Update existing code
+                            existingCode.Code = verificationCode;
+                            existingCode.CreatedAt = DateTime.UtcNow;
+                            existingCode.ExpiresAt = expiresAt;
+                            existingCode.FailedAttempts = 0;
+                        }
+                        else
+                        {
+                            // Create new verification code
+                            var emailVerification = new EmailVerificationCode
+                            {
+                                UserId = user.Id,
+                                Code = verificationCode,
+                                CreatedAt = DateTime.UtcNow,
+                                ExpiresAt = expiresAt,
+                                IsUsed = false,
+                                FailedAttempts = 0
+                            };
+                            _context.EmailVerificationCodes.Add(emailVerification);
+                        }
+
+                        await _context.SaveChangesAsync();
+
+                        // Send verification email
+                        var emailSent = await _emailService.SendEmailVerificationCodeAsync(
+                            user.Email,
+                            verificationCode,
+                            $"{user.FirstName} {user.LastName}".Trim()
+                        );
+
+                        if (emailSent)
+                            _logger?.LogInformation("Email verification sent to {Email} on first login", user.Email);
+                        else
+                            _logger?.LogWarning("Failed to send email verification to {Email} on first login", user.Email);
+                    }
+                    catch (Exception emailEx)
+                    {
+                        _logger?.LogError(emailEx, "Failed to send email verification to {Email} on first login", user.Email);
+                    }
+                }
+
                 // Generate tokens
                 var accessToken = GenerateAccessToken(user);
                 var refreshToken = GenerateRefreshToken();
@@ -447,19 +512,19 @@ namespace eVeterinarskaStanicaServices
             return random.Next(100000, 999999).ToString();
         }
 
-        public async Task<ServiceResult> RegisterAsync(RegisterRequest request)
+        public async Task<ServiceResult<RegisterResponse>> RegisterAsync(RegisterRequest request)
         {
             try
             {
                 var existingUserByEmail = await _context.Users
                     .FirstOrDefaultAsync(u => u.Email == request.Email);
                 if (existingUserByEmail != null)
-                    return ServiceResult.ErrorResult("User with this email already exists");
+                    return ServiceResult<RegisterResponse>.ErrorResult("User with this email already exists");
 
                 var existingUserByUsername = await _context.Users
                     .FirstOrDefaultAsync(u => u.Username == request.Username);
                 if (existingUserByUsername != null)
-                    return ServiceResult.ErrorResult("Username is already taken");
+                    return ServiceResult<RegisterResponse>.ErrorResult("Username is already taken");
 
                 var hashedPassword = _hashingService.HashPassword(request.Password, out byte[] salt);
 
@@ -500,6 +565,8 @@ namespace eVeterinarskaStanicaServices
                 _context.EmailVerificationCodes.Add(emailVerification);
                 await _context.SaveChangesAsync();
 
+                // Email verification will be sent when user first logs in
+                /*
                 try
                 {
                     var adminEmails = await _context.Users
@@ -530,7 +597,10 @@ namespace eVeterinarskaStanicaServices
                 {
                     _logger?.LogError(ex, "Failed to publish user registration notification for {Email}: {Message}", request.Email, ex.Message);
                 }
+                */
 
+                // Email verification will be sent when user first logs in
+                /*
                 try
                 {
                     var emailSent = await _emailService.SendEmailVerificationCodeAsync(
@@ -548,8 +618,17 @@ namespace eVeterinarskaStanicaServices
                 {
                     _logger?.LogError(emailEx, "Failed to send direct verification email to {Email}", newUser.Email);
                 }
+                */
 
-                return ServiceResult.SuccessResult();
+                return ServiceResult<RegisterResponse>.SuccessResult(new RegisterResponse
+                {
+                    UserId = newUser.Id,
+                    Message = "Registration successful! You can now log in.",
+                    Email = newUser.Email,
+                    FirstName = newUser.FirstName,
+                    LastName = newUser.LastName,
+                    DateCreated = newUser.DateCreated
+                });
             }
             catch (Exception ex)
             {
@@ -557,7 +636,7 @@ namespace eVeterinarskaStanicaServices
                 var fullError = $"Registration failed: {ex.Message}. Inner: {innerException}";
                 _logger?.LogError(ex, "Registration error for {Email}: {Error}", request.Email, fullError);
 
-                return ServiceResult.ErrorResult($"Registration failed: {ex.Message}");
+                return ServiceResult<RegisterResponse>.ErrorResult($"Registration failed: {ex.Message}");
             }
         }
 
@@ -678,6 +757,96 @@ namespace eVeterinarskaStanicaServices
         {
             var random = new Random();
             return random.Next(100000, 999999).ToString();
+        }
+
+        public async Task<ServiceResult<User>> GetUserByIdAsync(int userId)
+        {
+            try
+            {
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+                if (user == null)
+                {
+                    return ServiceResult<User>.ErrorResult("User not found");
+                }
+
+                return ServiceResult<User>.SuccessResult(user);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting user by ID {UserId}", userId);
+                return ServiceResult<User>.ErrorResult("Error retrieving user");
+            }
+        }
+
+        public async Task<ServiceResult> UpdateUserProfileAsync(int userId, UpdateProfileRequest request)
+        {
+            try
+            {
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+                if (user == null)
+                {
+                    return ServiceResult.ErrorResult("User not found");
+                }
+
+                // Update basic fields if provided
+                if (!string.IsNullOrEmpty(request.FirstName))
+                    user.FirstName = request.FirstName;
+                
+                if (!string.IsNullOrEmpty(request.LastName))
+                    user.LastName = request.LastName;
+                
+                if (!string.IsNullOrEmpty(request.Email))
+                {
+                    // Check if email is already taken by another user
+                    var existingUser = await _context.Users
+                        .FirstOrDefaultAsync(u => u.Email == request.Email && u.Id != userId);
+                    if (existingUser != null)
+                    {
+                        return ServiceResult.ErrorResult("Email is already taken");
+                    }
+                    user.Email = request.Email;
+                }
+                
+                if (!string.IsNullOrEmpty(request.PhoneNumber))
+                    user.PhoneNumber = request.PhoneNumber;
+                
+                if (!string.IsNullOrEmpty(request.Address))
+                    user.Address = request.Address;
+
+                // Update veterinarian specific fields if user is a veterinarian
+                if (user.Role == UserRole.Veterinarian)
+                {
+                    if (!string.IsNullOrEmpty(request.LicenseNumber))
+                        user.LicenseNumber = request.LicenseNumber;
+                    
+                    if (!string.IsNullOrEmpty(request.Specialization))
+                        user.Specialization = request.Specialization;
+                    
+                    if (request.YearsOfExperience.HasValue)
+                        user.YearsOfExperience = request.YearsOfExperience.Value;
+                    
+                    if (!string.IsNullOrEmpty(request.Biography))
+                        user.Biography = request.Biography;
+                }
+
+                // Update password if provided
+                if (!string.IsNullOrEmpty(request.Password))
+                {
+                    byte[] salt;
+                    user.PasswordHash = _hashingService.HashPassword(request.Password, out salt);
+                    user.PasswordSalt = Convert.ToBase64String(salt);
+                }
+
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("User profile updated successfully for user {UserId}", userId);
+                return ServiceResult.SuccessResult();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating user profile for user {UserId}", userId);
+                return ServiceResult.ErrorResult("Error updating profile");
+            }
         }
     }
 }

@@ -33,6 +33,9 @@ namespace eVeterinarskaStanicaServices.Database
         
         // Email verification DbSet
         public DbSet<EmailVerificationCode> EmailVerificationCodes { get; set; }
+        
+        // Reviews DbSet
+        public DbSet<Review> Reviews { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -113,6 +116,11 @@ namespace eVeterinarskaStanicaServices.Database
                     .WithOne(a => a.Service)
                     .HasForeignKey(a => a.ServiceId)
                     .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasMany(s => s.Reviews)
+                    .WithOne(r => r.Service)
+                    .HasForeignKey(r => r.ServiceId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             // Configure Asset entity
@@ -187,6 +195,11 @@ namespace eVeterinarskaStanicaServices.Database
                     .WithOne(p => p.Order)
                     .HasForeignKey(p => p.OrderId)
                     .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasMany(o => o.Reviews)
+                    .WithOne(r => r.Order)
+                    .HasForeignKey(r => r.OrderId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             // Configure OrderItem entity
@@ -386,6 +399,53 @@ namespace eVeterinarskaStanicaServices.Database
                 // Index for faster lookups
                 entity.HasIndex(e => new { e.UserId, e.Code });
                 entity.HasIndex(e => e.CreatedAt);
+            });
+
+            // Configure Review entity
+            modelBuilder.Entity<Review>(entity =>
+            {
+                entity.ToTable("Review"); // Eksplicitno postavi ime tabele
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Title).HasMaxLength(100);
+                entity.Property(e => e.Comment).HasMaxLength(2000);
+                entity.Property(e => e.PetName).HasMaxLength(100);
+                entity.Property(e => e.PetSpecies).HasMaxLength(50);
+
+                // Configure foreign key properties explicitly
+                entity.Property(e => e.UserId).IsRequired();
+                entity.Property(e => e.VeterinarianId).IsRequired(false);
+                entity.Property(e => e.ServiceId).IsRequired(false);
+                entity.Property(e => e.OrderId).IsRequired(false);
+
+                // Configure relationship: Review -> User (koji je ostavio review)
+                entity.HasOne(r => r.User)
+                    .WithMany(u => u.Reviews)
+                    .HasForeignKey(r => r.UserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                // Configure relationship: Review -> Veterinarian (User koji se ocjenjuje)
+                entity.HasOne(r => r.Veterinarian)
+                    .WithMany()
+                    .HasForeignKey(r => r.VeterinarianId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                // Configure relationship: Review -> Service (opcionalno)
+                entity.HasOne(r => r.Service)
+                    .WithMany()
+                    .HasForeignKey(r => r.ServiceId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                // Configure relationship: Review -> Order (opcionalno)
+                entity.HasOne(r => r.Order)
+                    .WithMany()
+                    .HasForeignKey(r => r.OrderId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                // Indexes for faster lookups
+                entity.HasIndex(e => e.VeterinarianId);
+                entity.HasIndex(e => e.UserId);
+                entity.HasIndex(e => e.ServiceId);
+                entity.HasIndex(e => e.IsApproved);
             });
         }
     }

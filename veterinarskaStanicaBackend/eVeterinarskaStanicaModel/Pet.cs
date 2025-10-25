@@ -59,6 +59,9 @@ namespace eVeterinarskaStanicaModel
 
         // Foreign Keys
         public int PetOwnerId { get; set; }
+        
+        // Ko je dodao pacijenta (veterinar ili admin)
+        public int? CreatedBy { get; set; }
 
         // Navigation Properties
         public virtual User PetOwner { get; set; }

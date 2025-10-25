@@ -50,7 +50,7 @@ services:
       - RabbitMQ__VirtualHost=/
       - RabbitMQ__Enabled=true
     ports:
-      - "5160:5160"
+      - "0.0.0.0:5160:5160"
     volumes:
       - veterinary_uploads:/app/uploads
       - veterinary_assets:/app/Assets

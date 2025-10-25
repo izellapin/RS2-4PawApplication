@@ -8,18 +8,22 @@ using eVeterinarskaStanicaModel.Requests;
 using eVeterinarskaStanicaModel.Responses;
 using eVeterinarskaStanicaModel.SearchObjects;
 using System.ComponentModel.DataAnnotations;
+using Microsoft.EntityFrameworkCore;
 
 namespace veterinarskaStanica.WebAPI.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class UserController : ControllerBase
     {
         private readonly IUserService _userService;
+        private readonly ApplicationDbContext _context;
 
-        public UserController(IUserService userService)
+        public UserController(IUserService userService, ApplicationDbContext context)
         {
             _userService = userService;
+            _context = context;
         }
 
         // GET: api/User - Admin and Staff can view all users
@@ -132,6 +136,76 @@ namespace veterinarskaStanica.WebAPI.Controllers
             }
             
             return NoContent();
+        }
+
+        // GET: api/User/veterinarians - Public endpoint for getting veterinarians
+        [HttpGet("veterinarians")]
+        [AllowAnonymous]
+        public async Task<ActionResult<IEnumerable<object>>> GetVeterinarians()
+        {
+            var veterinarians = await _context.Users
+                .Where(u => u.Role == UserRole.Veterinarian && u.IsActive == true)
+                .Select(u => new
+                {
+                    u.Id,
+                    u.FirstName,
+                    u.LastName,
+                    u.Email,
+                    u.Specialization,
+                    u.YearsOfExperience,
+                    u.Biography,
+                    u.WorkStartTime,
+                    u.WorkEndTime,
+                    u.WorkDays
+                })
+                .OrderBy(u => u.FirstName)
+                .ToListAsync();
+
+            return Ok(veterinarians);
+        }
+
+        // GET: api/User/{userId}/current-veterinarian - Get current veterinarian for a user
+        [HttpGet("{userId}/current-veterinarian")]
+        public async Task<ActionResult<object>> GetCurrentVeterinarian(int userId)
+        {
+            // Get the most recent appointment for this user to find their current veterinarian
+            var latestAppointment = await _context.Appointments
+                .Where(a => a.Pet.PetOwnerId == userId)
+                .OrderByDescending(a => a.AppointmentDate)
+                .ThenByDescending(a => a.DateCreated)
+                .FirstOrDefaultAsync();
+
+            if (latestAppointment == null)
+            {
+                return Ok(new { hasVeterinarian = false });
+            }
+
+            var veterinarian = await _context.Users
+                .Where(u => u.Id == latestAppointment.VeterinarianId)
+                .Select(u => new
+                {
+                    u.Id,
+                    u.FirstName,
+                    u.LastName,
+                    u.Email,
+                    u.Specialization,
+                    u.YearsOfExperience,
+                    u.Biography,
+                    u.WorkStartTime,
+                    u.WorkEndTime,
+                    u.WorkDays
+                })
+                .FirstOrDefaultAsync();
+
+            if (veterinarian == null)
+            {
+                return Ok(new { hasVeterinarian = false });
+            }
+
+            return Ok(new { 
+                hasVeterinarian = true,
+                veterinarian = veterinarian
+            });
         }
 
         // POST: api/User/verify-password

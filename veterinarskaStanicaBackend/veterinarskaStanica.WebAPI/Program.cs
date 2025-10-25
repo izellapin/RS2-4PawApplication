@@ -13,12 +13,15 @@ namespace veterinarskaStanica.WebAPI
         public static async Task Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
+            
+            // Configure Kestrel to listen on all interfaces for development
+            builder.WebHost.UseUrls("http://0.0.0.0:5160");
 
             // Add services to the container.
             var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
             builder.Services.AddDatabaseServices(connectionString);
 
-            builder.Services.AddTransient<iServiceService, DummyServiceService>();
+            builder.Services.AddTransient<iServiceService, ServiceService>();
             builder.Services.AddScoped<IAuthService, AuthService>();
 
             // ===== JWT Authentication (no fallbacks, consistent UTF8) =====
@@ -62,7 +65,14 @@ namespace veterinarskaStanica.WebAPI
                     };
                 });
 
-            builder.Services.AddControllers();
+            builder.Services.AddControllers()
+                .AddJsonOptions(options =>
+                {
+                    options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+                    options.JsonSerializerOptions.WriteIndented = true;
+                    // Remove JsonStringEnumConverter to send enum values as numbers
+                    // options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+                });
 
             // ===== CORS =====
             builder.Services.AddCors(options =>
@@ -83,33 +93,14 @@ namespace veterinarskaStanica.WebAPI
                 {
                     Title = "Veterinary Clinic API",
                     Version = "v1",
-                    Description = "API for Veterinary Clinic Management System with role-based authentication"
+                    Description = "API for Veterinary Clinic Management System"
                 });
-
-                // Use proper HTTP Bearer scheme so the UI can prepend "Bearer " automatically if desired
-                c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+                
+                // Exclude ErrorController from Swagger
+                c.DocInclusionPredicate((docName, apiDesc) =>
                 {
-                    Description = "JWT Authorization using the Bearer scheme. Enter your token below.",
-                    Name = "Authorization",
-                    In = ParameterLocation.Header,
-                    Type = SecuritySchemeType.Http,
-                    Scheme = "bearer",
-                    BearerFormat = "JWT"
-                });
-
-                c.AddSecurityRequirement(new OpenApiSecurityRequirement
-                {
-                    {
-                        new OpenApiSecurityScheme
-                        {
-                            Reference = new OpenApiReference
-                            {
-                                Type = ReferenceType.SecurityScheme,
-                                Id = "Bearer"
-                            }
-                        },
-                        Array.Empty<string>()
-                    }
+                    return !apiDesc.ActionDescriptor.RouteValues.ContainsKey("controller") ||
+                           apiDesc.ActionDescriptor.RouteValues["controller"] != "Error";
                 });
             });
 
@@ -150,7 +141,10 @@ namespace veterinarskaStanica.WebAPI
                 app.UseSwaggerUI();
             }
 
-            app.UseHttpsRedirection();
+            // app.UseHttpsRedirection(); // Disabled for development to allow HTTP connections
+
+            // Add exception handler for better error logging
+            app.UseExceptionHandler("/error");
 
             app.UseCors("AllowAll");
 

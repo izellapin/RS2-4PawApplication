@@ -16,12 +16,12 @@ namespace eVeterinarskaStanicaServices
             {
                 Id = 1,
                 Code = "CONSULT",
-                Name = "General Consultation",
-                Description = "Comprehensive health examination for pets",
-                ShortDescription = "General pet health checkup",
-                Price = 50.00m,
-                ServiceType = "Consultation",
-                DurationMinutes = 30,
+                Name = "Godišnji pregled",
+                Description = "Sveobuhvatan godišnji zdravstveni pregled vašeg ljubimca",
+                ShortDescription = "Kompletni zdravstveni pregled",
+                Price = 75.00m,
+                ServiceType = "Pregled",
+                DurationMinutes = 45,
                 RequiresAppointment = true,
                 IsActive = true,
                 CategoryId = 1
@@ -31,12 +31,12 @@ namespace eVeterinarskaStanicaServices
             {
                 Id = 2,
                 Code = "VACC",
-                Name = "Vaccination",
-                Description = "Annual vaccination for dogs and cats",
-                ShortDescription = "Pet vaccination service",
-                Price = 75.00m,
-                ServiceType = "Vaccination",
-                DurationMinutes = 15,
+                Name = "Vakcinacija",
+                Description = "Osnovne vakcine za zaštitu vašeg ljubimca od bolesti",
+                ShortDescription = "Osnovne vakcine",
+                Price = 120.00m,
+                ServiceType = "Vakcinacija",
+                DurationMinutes = 30,
                 RequiresAppointment = true,
                 IsActive = true,
                 CategoryId = 1
@@ -46,12 +46,12 @@ namespace eVeterinarskaStanicaServices
             {
                 Id = 3,
                 Code = "GROOM",
-                Name = "Pet Grooming",
-                Description = "Complete grooming service including bath, nail trimming, and hair cut",
-                ShortDescription = "Professional pet grooming",
-                Price = 40.00m,
-                ServiceType = "Grooming",
-                DurationMinutes = 60,
+                Name = "Kompletno čišćenje",
+                Description = "Kompletna usluga čišćenja uključujući kupanje, šišanje noktiju i stilizovanje",
+                ShortDescription = "Kompletno čišćenje",
+                Price = 80.00m,
+                ServiceType = "Čišćenje",
+                DurationMinutes = 120,
                 RequiresAppointment = true,
                 IsActive = true,
                 CategoryId = 2
@@ -61,15 +61,45 @@ namespace eVeterinarskaStanicaServices
             {
                 Id = 4,
                 Code = "EMERG",
-                Name = "Emergency Care",
-                Description = "24/7 emergency veterinary care",
-                ShortDescription = "Emergency veterinary services",
+                Name = "Hitna pomoć",
+                Description = "Hitna veterinarska konsultacija za urgentne slučajeve",
+                ShortDescription = "Hitna veterinarska pomoć",
                 Price = 150.00m,
-                ServiceType = "Emergency",
-                DurationMinutes = 120,
+                ServiceType = "Hitno",
+                DurationMinutes = 60,
                 RequiresAppointment = false,
                 IsActive = true,
                 CategoryId = 3
+            });
+
+            services.Add(new Service()
+            {
+                Id = 5,
+                Code = "SURG",
+                Name = "Sterilizacija",
+                Description = "Hirurška sterilizacija ljubimca",
+                ShortDescription = "Operacija sterilizacije",
+                Price = 300.00m,
+                ServiceType = "Hirurgija",
+                DurationMinutes = 120,
+                RequiresAppointment = true,
+                IsActive = true,
+                CategoryId = 4
+            });
+
+            services.Add(new Service()
+            {
+                Id = 6,
+                Code = "DENTAL",
+                Name = "Čišćenje zuba",
+                Description = "Profesionalno čišćenje zuba i procjena oralnog zdravlja",
+                ShortDescription = "Čišćenje zuba",
+                Price = 200.00m,
+                ServiceType = "Stomatologija",
+                DurationMinutes = 90,
+                RequiresAppointment = true,
+                IsActive = true,
+                CategoryId = 5
             });
 
             var queryable = services.AsQueryable();
@@ -137,12 +167,12 @@ namespace eVeterinarskaStanicaServices
             {
                 Id = 1,
                 Code = "CONSULT",
-                Name = "General Consultation",
-                Description = "Comprehensive health examination for pets",
-                ShortDescription = "General pet health checkup",
-                Price = 50.00m,
-                ServiceType = "Consultation",
-                DurationMinutes = 30,
+                Name = "Godišnji pregled",
+                Description = "Sveobuhvatan godišnji zdravstveni pregled vašeg ljubimca",
+                ShortDescription = "Kompletni zdravstveni pregled",
+                Price = 75.00m,
+                ServiceType = "Pregled",
+                DurationMinutes = 45,
                 RequiresAppointment = true,
                 IsActive = true,
                 CategoryId = 1

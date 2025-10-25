@@ -15,7 +15,7 @@ namespace eVeterinarskaStanicaServices
         string[] GetRolePermissions(UserRole role);
         
         // Registration Methods
-        Task<ServiceResult> RegisterAsync(RegisterRequest request);
+        Task<ServiceResult<RegisterResponse>> RegisterAsync(RegisterRequest request);
         Task<ServiceResult> VerifyEmailAsync(VerifyEmailRequest request);
         Task<ServiceResult> ResendEmailVerificationCodeAsync(string email);
         
@@ -23,5 +23,9 @@ namespace eVeterinarskaStanicaServices
         Task<ServiceResult<Login2FAResponse>> InitiateTwoFactorLoginAsync(LoginRequest request);
         Task<ServiceResult<AuthResponse>> VerifyTwoFactorCodeAsync(Verify2FARequest request);
         Task<ServiceResult> ResendTwoFactorCodeAsync(string email);
+        
+        // Profile Management
+        Task<ServiceResult<User>> GetUserByIdAsync(int userId);
+        Task<ServiceResult> UpdateUserProfileAsync(int userId, UpdateProfileRequest request);
     }
 }

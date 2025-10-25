@@ -293,3 +293,17 @@ builder.Services.AddHostedService<NotificationSubscriberService>(); // Drugi ins
 **Napomena**: Ova implementacija prati isti pattern kao CineVibe projekat - kreiranje entiteta, dobijanje korisničkih emailova, kreiranje notification DTO-a i publishing preko RabbitMQ-a.
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+

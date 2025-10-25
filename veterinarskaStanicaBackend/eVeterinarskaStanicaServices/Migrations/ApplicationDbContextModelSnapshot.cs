@@ -554,7 +554,7 @@ namespace eVeterinarskaStanicaServices.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Notification");
+                    b.ToTable("Notifications");
                 });
 
             modelBuilder.Entity("eVeterinarskaStanicaModel.Order", b =>
@@ -785,6 +785,9 @@ namespace eVeterinarskaStanicaServices.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("DateCreated")
                         .HasColumnType("datetime2");
 
@@ -997,6 +1000,9 @@ namespace eVeterinarskaStanicaServices.Migrations
                     b.Property<int?>("OrderId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("OrderId1")
+                        .HasColumnType("int");
+
                     b.Property<string>("PetName")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
@@ -1008,7 +1014,10 @@ namespace eVeterinarskaStanicaServices.Migrations
                     b.Property<int>("Rating")
                         .HasColumnType("int");
 
-                    b.Property<int>("ServiceId")
+                    b.Property<int?>("ServiceId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ServiceId1")
                         .HasColumnType("int");
 
                     b.Property<string>("Title")
@@ -1018,15 +1027,26 @@ namespace eVeterinarskaStanicaServices.Migrations
                     b.Property<int>("UserId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("VeterinarianId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("IsApproved");
 
                     b.HasIndex("OrderId");
 
+                    b.HasIndex("OrderId1");
+
                     b.HasIndex("ServiceId");
+
+                    b.HasIndex("ServiceId1");
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Review");
+                    b.HasIndex("VeterinarianId");
+
+                    b.ToTable("Review", (string)null);
                 });
 
             modelBuilder.Entity("eVeterinarskaStanicaModel.Service", b =>
@@ -1649,26 +1669,41 @@ namespace eVeterinarskaStanicaServices.Migrations
             modelBuilder.Entity("eVeterinarskaStanicaModel.Review", b =>
                 {
                     b.HasOne("eVeterinarskaStanicaModel.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("eVeterinarskaStanicaModel.Order", null)
                         .WithMany("Reviews")
-                        .HasForeignKey("OrderId");
+                        .HasForeignKey("OrderId1");
 
                     b.HasOne("eVeterinarskaStanicaModel.Service", "Service")
-                        .WithMany("Reviews")
+                        .WithMany()
                         .HasForeignKey("ServiceId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("eVeterinarskaStanicaModel.Service", null)
+                        .WithMany("Reviews")
+                        .HasForeignKey("ServiceId1");
 
                     b.HasOne("eVeterinarskaStanicaModel.User", "User")
                         .WithMany("Reviews")
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("eVeterinarskaStanicaModel.User", "Veterinarian")
+                        .WithMany()
+                        .HasForeignKey("VeterinarianId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Order");
 
                     b.Navigation("Service");
 
                     b.Navigation("User");
+
+                    b.Navigation("Veterinarian");
                 });
 
             modelBuilder.Entity("eVeterinarskaStanicaModel.Service", b =>
