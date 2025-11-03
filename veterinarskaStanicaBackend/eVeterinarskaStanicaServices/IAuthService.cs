@@ -17,6 +17,7 @@ namespace eVeterinarskaStanicaServices
         // Registration Methods
         Task<ServiceResult<RegisterResponse>> RegisterAsync(RegisterRequest request);
         Task<ServiceResult> VerifyEmailAsync(VerifyEmailRequest request);
+        Task<ServiceResult> VerifyEmailByTokenAsync(string token);
         Task<ServiceResult> ResendEmailVerificationCodeAsync(string email);
         
         // 2FA Methods

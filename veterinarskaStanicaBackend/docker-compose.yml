@@ -18,7 +18,6 @@ services:
     networks:
       - veterinary-network
     healthcheck:
-      # SQL Server javlja ovu poruku kad je spreman u /var/opt/mssql/log/errorlog
       test: ["CMD-SHELL", "grep -q 'SQL Server is now ready for client connections' /var/opt/mssql/log/errorlog"]
       interval: 10s
       timeout: 5s

@@ -296,6 +296,26 @@ namespace veterinarskaStanica.WebAPI.Controllers
         }
 
         /// <summary>
+        /// Verify email via clickable link (token in query string)
+        /// </summary>
+        [HttpGet("verify-email")]
+        public async Task<ActionResult> VerifyEmailByToken([FromQuery] string token)
+        {
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                return BadRequest(new { message = "Missing token" });
+            }
+
+            var result = await _authService.VerifyEmailByTokenAsync(token);
+            if (result.Success)
+            {
+                return Ok(new { message = "Email verified successfully! You can now login." });
+            }
+
+            return BadRequest(new { message = result.ErrorMessage });
+        }
+
+        /// <summary>
         /// Resend email verification code
         /// </summary>
         [HttpPost("resend-email-verification")]

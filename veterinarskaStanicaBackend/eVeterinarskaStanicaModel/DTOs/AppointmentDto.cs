@@ -19,6 +19,12 @@ namespace eVeterinarskaStanicaModel.DTOs
         public decimal? ActualCost { get; set; }
         public string? Reason { get; set; }
         public string? Notes { get; set; }
+
+        // Payment status fields
+        public bool IsPaid { get; set; }
+        public DateTime? PaymentDate { get; set; }
+        public string? PaymentMethod { get; set; }
+        public string? PaymentTransactionId { get; set; }
     }
 }
 

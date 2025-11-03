@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:veterinarska_shared/veterinarska_shared.dart';
 import 'screens/appointments/appointments_list_screen.dart';
 import 'screens/appointments/book_appointment_screen.dart';
@@ -10,6 +12,15 @@ import 'screens/home/dashboard_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Load environment variables
+  await dotenv.load(fileName: ".env");
+  
+  // Initialize Stripe
+  Stripe.publishableKey = dotenv.env['STRIPE_PUBLISHABLE_KEY'] ?? '';
+  Stripe.merchantIdentifier = 'merchant.com.4paw.veterinary';
+  await Stripe.instance.applySettings();
+  
   await serviceLocator.initialize();
   runApp(const MyApp());
 }
@@ -76,7 +87,9 @@ class AuthWrapper extends StatelessWidget {
 }
 
 class MobileHomeScreen extends StatefulWidget {
-  const MobileHomeScreen({super.key});
+  final int initialIndex;
+
+  const MobileHomeScreen({super.key, this.initialIndex = 0});
 
   @override
   State<MobileHomeScreen> createState() => _MobileHomeScreenState();
@@ -91,6 +104,12 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
     const MobileAppointmentsListScreen(),
     const MobileProfileScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+  }
 
   @override
   Widget build(BuildContext context) {

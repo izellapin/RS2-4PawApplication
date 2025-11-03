@@ -43,6 +43,10 @@ class Appointment {
   final int? serviceId;
   final String? serviceName;
   final String? ownerName;
+  final bool isPaid;
+  final DateTime? paymentDate;
+  final String? paymentMethod;
+  final String? paymentTransactionId;
   final DateTime createdAt;
   final DateTime? updatedAt;
 
@@ -65,6 +69,10 @@ class Appointment {
     this.serviceId,
     this.serviceName,
     this.ownerName,
+    this.isPaid = false,
+    this.paymentDate,
+    this.paymentMethod,
+    this.paymentTransactionId,
     required this.createdAt,
     this.updatedAt,
   });
@@ -273,6 +281,10 @@ class Appointment {
             (json['owner']?['firstName'] != null
                 ? '${json['owner']['firstName']} ${json['owner']['lastName']}'
                 : null),
+        isPaid: json['isPaid'] as bool? ?? false,
+        paymentDate: json['paymentDate'] != null ? DateTime.tryParse(json['paymentDate'] as String) : null,
+        paymentMethod: json['paymentMethod'] as String?,
+        paymentTransactionId: json['paymentTransactionId'] as String?,
         createdAt: DateTime.parse(json['createdAt'] as String? ?? json['dateCreated'] as String? ?? DateTime.now().toIso8601String()),
         updatedAt: json['updatedAt'] != null 
             ? DateTime.tryParse(json['updatedAt'] as String) 

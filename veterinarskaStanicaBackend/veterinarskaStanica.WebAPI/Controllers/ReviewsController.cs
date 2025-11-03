@@ -23,6 +23,51 @@ namespace veterinarskaStanica.WebAPI.Controllers
         }
 
         /// <summary>
+        /// Svi review-i (admin), uključujući ime korisnika i veterinara
+        /// </summary>
+        [HttpGet("all")]
+        [RoleRequired(UserRole.Admin)]
+        public async Task<ActionResult<List<ReviewDto>>> GetAllReviews()
+        {
+            var reviews = await _context.Set<Review>()
+                .Include(r => r.User)
+                .Include(r => r.Veterinarian)
+                .OrderByDescending(r => r.DateCreated)
+                .Select(r => new ReviewDto
+                {
+                    Id = r.Id,
+                    Rating = r.Rating,
+                    Title = r.Title,
+                    Comment = r.Comment,
+                    DateCreated = r.DateCreated,
+                    IsVerifiedPurchase = r.IsVerifiedPurchase,
+                    IsApproved = r.IsApproved,
+                    PetName = r.PetName,
+                    PetSpecies = r.PetSpecies,
+                    VeterinarianName = r.Veterinarian != null ? r.Veterinarian.FirstName + " " + r.Veterinarian.LastName : null,
+                    UserName = r.User.FirstName + " " + r.User.LastName
+                })
+                .ToListAsync();
+
+            return Ok(reviews);
+        }
+
+        /// <summary>
+        /// Brisanje review-a (admin)
+        /// </summary>
+        [HttpDelete("{id}")]
+        [RoleRequired(UserRole.Admin)]
+        public async Task<ActionResult> DeleteReview(int id)
+        {
+            var review = await _context.Set<Review>().FindAsync(id);
+            if (review == null) return NotFound();
+
+            _context.Set<Review>().Remove(review);
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+
+        /// <summary>
         /// Kreiranje review-a za veterinara (samo PetOwner može ocjenjivati)
         /// </summary>
         [HttpPost("veterinarian/{veterinarianId}")]
@@ -48,11 +93,15 @@ namespace veterinarskaStanica.WebAPI.Controllers
                     return NotFound("Veterinar nije pronađen");
                 }
 
-                // Provjeri da li je korisnik bio kod ovog veterinara (ima završen termin)
+                // Provjeri da li je korisnik bio kod ovog veterinara (završen ili plaćen ili prošao termin)
                 var hasVisited = await _context.Appointments
-                    .AnyAsync(a => a.VeterinarianId == veterinarianId && 
-                                 a.Pet.PetOwnerId == userId && 
-                                 a.Status == AppointmentStatus.Completed);
+                    .AnyAsync(a => a.VeterinarianId == veterinarianId &&
+                                   a.Pet.PetOwnerId == userId &&
+                                   (
+                                       a.Status == AppointmentStatus.Completed ||
+                                       a.IsPaid ||
+                                       a.AppointmentDate < DateTime.UtcNow
+                                   ));
 
                 if (!hasVisited)
                 {
@@ -80,7 +129,8 @@ namespace veterinarskaStanica.WebAPI.Controllers
                     PetSpecies = request.PetSpecies,
                     DateCreated = DateTime.UtcNow,
                     IsVerifiedPurchase = true, // Jer smo provjerili da ima završen termin
-                    IsApproved = false // Admin mora odobriti
+                    // Odmah prikaži ocjene u statistikama veterinara
+                    IsApproved = true
                 };
 
                 _context.Set<Review>().Add(review);

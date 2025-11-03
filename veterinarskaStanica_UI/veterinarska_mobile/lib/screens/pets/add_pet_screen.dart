@@ -99,20 +99,20 @@ class _AddPetScreenState extends State<AddPetScreen> {
         }
       } else {
         // Add mode
-        await apiClient.addPet(petData);
+        final createdPet = await apiClient.addPet(petData);
         
-        if (mounted) {
+        if (mounted && createdPet != null) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Ljubimac je uspešno dodat'),
               backgroundColor: Colors.green,
             ),
           );
+          
+          // Pozovi callback za refresh liste NAKON prikazivanja poruke
+          widget.onPetAdded?.call();
         }
       }
-      
-      // Pozovi callback za refresh liste
-      widget.onPetAdded?.call();
       
       if (mounted) {
         Navigator.of(context).pop();

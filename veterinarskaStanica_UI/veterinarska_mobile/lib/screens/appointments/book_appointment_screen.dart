@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:veterinarska_shared/veterinarska_shared.dart';
+import '../payments/stripe_payment_screen.dart';
 
 class BookAppointmentScreen extends StatefulWidget {
   final VoidCallback? onAppointmentBooked; // Callback za refresh liste
@@ -189,18 +190,63 @@ class _BookAppointmentScreenState extends State<BookAppointmentScreen> {
         'notes': _reasonController.text,
       };
       
-      await apiClient.bookAppointment(appointmentData);
+      final createdAppointment = await apiClient.bookAppointment(appointmentData);
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Termin je uspešno zakazan!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        
         // Pozovi callback za refresh liste
         widget.onAppointmentBooked?.call();
+        
+        // Ask user if they want to pay now
+        final shouldPay = await showDialog<bool>(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('Uspešno rezervisan termin!'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Termin je uspešno zakazan.\nCena usluge: ${_selectedService!['price']?.toString() ?? '0'} KM',
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Želite li da platite sada?',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Plati kasnije'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2E7D32),
+                  ),
+                  child: const Text('Plati sada'),
+                ),
+              ],
+            );
+          },
+        );
+
+        if (shouldPay == true && createdAppointment != null) {
+          // Navigate to payment screen
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => StripePaymentScreen(
+                appointment: createdAppointment,
+                amount: (_selectedService!['price'] as num?)?.toDouble() ?? 0.0,
+                service: _selectedService,
+              ),
+            ),
+          );
+        }
         
         Navigator.of(context).pop();
       }

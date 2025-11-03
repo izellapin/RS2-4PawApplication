@@ -7,6 +7,7 @@ import 'screens/appointment_screen.dart';
 import 'screens/financial_dashboard.dart';
 import 'screens/pets_screen.dart';
 import 'screens/veterinarians_screen.dart';
+import 'screens/reviews_screen.dart';
 import 'pages/profile_page.dart';
 
 void main() async {
@@ -559,6 +560,8 @@ class _MainScreenState extends State<MainScreen> {
       ),
       if (_userRole == UserRole.admin)
         const VeterinariansScreen(userRole: UserRole.admin),
+      if (_userRole == UserRole.admin)
+        const ReviewsScreen(),
       const ProfilePage(),
     ];
   }
@@ -585,6 +588,12 @@ class _MainScreenState extends State<MainScreen> {
         NavigationItem(
           icon: Icons.medical_services,
           label: 'Veterinari',
+        ),
+      );
+      items.add(
+        NavigationItem(
+          icon: Icons.reviews,
+          label: 'Recenzije',
         ),
       );
     }

@@ -72,6 +72,10 @@ namespace veterinarskaStanica.WebAPI.Controllers
                         ServiceName = a.Service != null ? a.Service.Name : null,
                         EstimatedCost = a.EstimatedCost,
                         ActualCost = a.ActualCost,
+                        IsPaid = a.IsPaid,
+                        PaymentDate = a.PaymentDate,
+                        PaymentMethod = a.PaymentMethod,
+                        PaymentTransactionId = a.PaymentTransactionId,
                         Reason = a.Reason,
                         Notes = a.Notes
                     })
@@ -136,6 +140,10 @@ namespace veterinarskaStanica.WebAPI.Controllers
                     ServiceName = a.Service != null ? a.Service.Name : null,
                     EstimatedCost = a.EstimatedCost,
                     ActualCost = a.ActualCost,
+                    IsPaid = a.IsPaid,
+                    PaymentDate = a.PaymentDate,
+                    PaymentMethod = a.PaymentMethod,
+                    PaymentTransactionId = a.PaymentTransactionId,
                     Reason = a.Reason,
                     Notes = a.Notes
                 })
@@ -166,6 +174,7 @@ namespace veterinarskaStanica.WebAPI.Controllers
                     Type = (int)a.Type,
                     Status = (int)a.Status,
                     PetName = a.Pet.Name,
+                    VeterinarianId = a.VeterinarianId,
                     OwnerName = $"{a.Pet.PetOwner.FirstName} {a.Pet.PetOwner.LastName}",
                     VeterinarianName = $"{a.Veterinarian.FirstName} {a.Veterinarian.LastName}",
                     ServiceName = a.Service != null ? a.Service.Name : null,
@@ -345,6 +354,18 @@ namespace veterinarskaStanica.WebAPI.Controllers
             _context.Appointments.Add(appointment);
             await _context.SaveChangesAsync();
 
+            // Ako nema EstimatedCost, ali ima ServiceId, uzmi cenu iz Service
+            if (!appointment.EstimatedCost.HasValue && appointment.ServiceId.HasValue)
+            {
+                var service = await _context.Services.FindAsync(appointment.ServiceId.Value);
+                if (service != null && service.Price > 0)
+                {
+                    appointment.EstimatedCost = service.Price;
+                    await _context.SaveChangesAsync();
+                    _logger.LogInformation($"💰 Set EstimatedCost to {service.Price} from Service.Price for appointment {appointment.Id}");
+                }
+            }
+
             // Dohvati kreirani appointment sa svim podacima
             var createdAppointment = await _context.Appointments
                 .Include(a => a.Pet)
@@ -498,6 +519,56 @@ namespace veterinarskaStanica.WebAPI.Controllers
             return NoContent();
         }
 
+        // PATCH: api/Appointments/5/mark-paid
+        [HttpPatch("{id}/mark-paid")]
+        [RoleRequired(UserRole.Admin, UserRole.Veterinarian, UserRole.PetOwner)]
+        public async Task<ActionResult<Appointment>> MarkPaid(int id, [FromBody] MarkPaidRequest request)
+        {
+            var appointment = await _context.Appointments.FindAsync(id);
+
+            if (appointment == null)
+            {
+                return NotFound();
+            }
+
+            // Označi kao plaćeno i završi termin
+            appointment.IsPaid = true;
+            appointment.PaymentDate = DateTime.UtcNow;
+            appointment.PaymentMethod = string.IsNullOrWhiteSpace(request.PaymentMethod) ? "Stripe" : request.PaymentMethod;
+            appointment.PaymentTransactionId = request.PaymentTransactionId;
+            // Kada je plaćeno, smatramo termin završenim radi izvještaja
+            appointment.Status = AppointmentStatus.Completed;
+
+            // Ako nema actual cost, postavi ga
+            if (!appointment.ActualCost.HasValue)
+            {
+                // Prvo pokušaj iz request.Amount
+                if (request.Amount.HasValue)
+                {
+                    appointment.ActualCost = request.Amount.Value;
+                }
+                // Ako nema Amount, pokušaj iz Service.Price
+                else if (appointment.ServiceId.HasValue)
+                {
+                    var service = await _context.Services.FindAsync(appointment.ServiceId.Value);
+                    if (service != null && service.Price > 0)
+                    {
+                        appointment.ActualCost = service.Price;
+                    }
+                }
+                // Na kraju, koristi EstimatedCost ako postoji
+                else if (appointment.EstimatedCost.HasValue)
+                {
+                    appointment.ActualCost = appointment.EstimatedCost;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+
+            return Ok(appointment);
+        }
+
+
         // DELETE: api/Appointments/5
         [HttpDelete("{id}")]
         [RoleRequired(UserRole.Admin)]
@@ -519,6 +590,15 @@ namespace veterinarskaStanica.WebAPI.Controllers
     }
 
     // Request modeli
+    public class MarkPaidRequest
+    {
+        [StringLength(100)]
+        public string? PaymentMethod { get; set; }
+        [StringLength(100)]
+        public string? PaymentTransactionId { get; set; }
+        public decimal? Amount { get; set; }
+    }
+
     public class AppointmentCreateRequest
     {
         [Required]

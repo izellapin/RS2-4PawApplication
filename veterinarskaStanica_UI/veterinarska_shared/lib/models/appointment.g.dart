@@ -25,6 +25,12 @@ Appointment _$AppointmentFromJson(Map<String, dynamic> json) => Appointment(
   serviceId: (json['serviceId'] as num?)?.toInt(),
   serviceName: json['serviceName'] as String?,
   ownerName: json['ownerName'] as String?,
+  isPaid: json['isPaid'] as bool? ?? false,
+  paymentDate: json['paymentDate'] == null
+      ? null
+      : DateTime.parse(json['paymentDate'] as String),
+  paymentMethod: json['paymentMethod'] as String?,
+  paymentTransactionId: json['paymentTransactionId'] as String?,
   createdAt: DateTime.parse(json['createdAt'] as String),
   updatedAt: json['updatedAt'] == null
       ? null
@@ -51,6 +57,10 @@ Map<String, dynamic> _$AppointmentToJson(Appointment instance) =>
       'serviceId': instance.serviceId,
       'serviceName': instance.serviceName,
       'ownerName': instance.ownerName,
+      'isPaid': instance.isPaid,
+      'paymentDate': instance.paymentDate?.toIso8601String(),
+      'paymentMethod': instance.paymentMethod,
+      'paymentTransactionId': instance.paymentTransactionId,
       'createdAt': instance.createdAt.toIso8601String(),
       'updatedAt': instance.updatedAt?.toIso8601String(),
     };

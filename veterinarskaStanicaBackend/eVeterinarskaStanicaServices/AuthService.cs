@@ -1,3 +1,4 @@
+
 using System;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
@@ -69,11 +70,14 @@ namespace eVeterinarskaStanicaServices
                 var isMobileClient = string.IsNullOrEmpty(request.ClientType) || 
                                    request.ClientType.Equals("Mobile", StringComparison.OrdinalIgnoreCase);
                 
-                if (!user.IsEmailVerified && user.LastLoginDate == null && recentCode == null && isMobileClient)
+                if (!user.IsEmailVerified)
                 {
                     try
                     {
-                        var verificationCode = GenerateEmailVerificationCode();
+                        // Only send/resend if we haven't sent one very recently
+                        if (recentCode == null)
+                        {
+                            var verificationCode = GenerateEmailVerificationToken();
                         var expirationMinutes = int.Parse(_configuration["EmailVerification:CodeExpirationMinutes"] ?? "30");
                         var expiresAt = DateTime.UtcNow.AddMinutes(expirationMinutes);
 
@@ -83,7 +87,6 @@ namespace eVeterinarskaStanicaServices
 
                         if (existingCode != null)
                         {
-                            // Update existing code
                             existingCode.Code = verificationCode;
                             existingCode.CreatedAt = DateTime.UtcNow;
                             existingCode.ExpiresAt = expiresAt;
@@ -91,7 +94,6 @@ namespace eVeterinarskaStanicaServices
                         }
                         else
                         {
-                            // Create new verification code
                             var emailVerification = new EmailVerificationCode
                             {
                                 UserId = user.Id,
@@ -106,22 +108,25 @@ namespace eVeterinarskaStanicaServices
 
                         await _context.SaveChangesAsync();
 
-                        // Send verification email
-                        var emailSent = await _emailService.SendEmailVerificationCodeAsync(
+                            var emailSent = await _emailService.SendEmailVerificationLinkAsync(
                             user.Email,
                             verificationCode,
                             $"{user.FirstName} {user.LastName}".Trim()
                         );
 
                         if (emailSent)
-                            _logger?.LogInformation("Email verification sent to {Email} on first login", user.Email);
+                                _logger?.LogInformation("Email verification link sent to {Email} on login", user.Email);
                         else
-                            _logger?.LogWarning("Failed to send email verification to {Email} on first login", user.Email);
+                                _logger?.LogWarning("Failed to send email verification link to {Email} on login", user.Email);
+                        }
                     }
                     catch (Exception emailEx)
                     {
                         _logger?.LogError(emailEx, "Failed to send email verification to {Email} on first login", user.Email);
                     }
+
+                    // Block mobile login until email is verified
+                    return ServiceResult<AuthResponse>.ErrorResult("Email not verified. We've sent you a verification link.");
                 }
 
                 // Generate tokens
@@ -548,7 +553,7 @@ namespace eVeterinarskaStanicaServices
                 _context.Users.Add(newUser);
                 await _context.SaveChangesAsync();
 
-                var verificationCode = GenerateEmailVerificationCode();
+                var verificationCode = GenerateEmailVerificationToken();
                 var expirationMinutes = int.Parse(_configuration["EmailVerification:CodeExpirationMinutes"] ?? "30");
                 var expiresAt = DateTime.UtcNow.AddMinutes(expirationMinutes);
 
@@ -565,60 +570,24 @@ namespace eVeterinarskaStanicaServices
                 _context.EmailVerificationCodes.Add(emailVerification);
                 await _context.SaveChangesAsync();
 
-                // Email verification will be sent when user first logs in
-                /*
+                // Send verification link immediately after registration
                 try
                 {
-                    var adminEmails = await _context.Users
-                        .Where(u => u.Role == UserRole.Admin)
-                        .Select(u => u.Email)
-                        .ToListAsync();
-
-                    var userRegistrationDto = new UserRegistrationNotificationDto
-                    {
-                        UserId = newUser.Id,
-                        FirstName = newUser.FirstName,
-                        LastName = newUser.LastName,
-                        Email = newUser.Email,
-                        PhoneNumber = newUser.PhoneNumber ?? string.Empty,
-                        Role = newUser.Role.ToString(),
-                        RegistrationDate = newUser.DateCreated,
-                        VerificationCode = verificationCode,
-                        IsEmailVerified = false,
-                        WelcomeMessage = "Thank you for registering with 4Paw Veterinary Clinic! Please verify your email address to complete your registration.",
-                        AdminEmails = adminEmails.ToList()
-                    };
-
-                    await _notificationPublisher.PublishUserRegistrationNotificationAsync(userRegistrationDto);
-
-                    _logger?.LogInformation("User registration notification published to RabbitMQ for user {Email}", request.Email);
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex, "Failed to publish user registration notification for {Email}: {Message}", request.Email, ex.Message);
-                }
-                */
-
-                // Email verification will be sent when user first logs in
-                /*
-                try
-                {
-                    var emailSent = await _emailService.SendEmailVerificationCodeAsync(
+                    var emailSent = await _emailService.SendEmailVerificationLinkAsync(
                         newUser.Email,
                         verificationCode,
                         $"{newUser.FirstName} {newUser.LastName}".Trim()
                     );
 
                     if (emailSent)
-                        _logger?.LogInformation("Direct verification email sent to {Email}", newUser.Email);
+                        _logger?.LogInformation("Verification link email sent to {Email}", newUser.Email);
                     else
-                        _logger?.LogWarning("Direct verification email failed for {Email}", newUser.Email);
+                        _logger?.LogWarning("Verification link email failed for {Email}", newUser.Email);
                 }
                 catch (Exception emailEx)
                 {
-                    _logger?.LogError(emailEx, "Failed to send direct verification email to {Email}", newUser.Email);
+                    _logger?.LogError(emailEx, "Failed to send verification link to {Email}", newUser.Email);
                 }
-                */
 
                 return ServiceResult<RegisterResponse>.SuccessResult(new RegisterResponse
                 {
@@ -688,6 +657,32 @@ namespace eVeterinarskaStanicaServices
             }
         }
 
+        public async Task<ServiceResult> VerifyEmailByTokenAsync(string token)
+        {
+            try
+            {
+                var record = await _context.EmailVerificationCodes
+                    .Include(e => e.User)
+                    .FirstOrDefaultAsync(e => e.Code == token && !e.IsUsed && e.ExpiresAt > DateTime.UtcNow);
+
+                if (record == null)
+                {
+                    return ServiceResult.ErrorResult("Invalid or expired verification link");
+                }
+
+                record.IsUsed = true;
+                record.UsedAt = DateTime.UtcNow;
+                record.User.IsEmailVerified = true;
+                await _context.SaveChangesAsync();
+
+                return ServiceResult.SuccessResult();
+            }
+            catch (Exception ex)
+            {
+                return ServiceResult.ErrorResult($"Email verification failed: {ex.Message}");
+            }
+        }
+
         public async Task<ServiceResult> ResendEmailVerificationCodeAsync(string email)
         {
             try
@@ -714,7 +709,7 @@ namespace eVeterinarskaStanicaServices
                     return ServiceResult.ErrorResult($"Please wait {remainingTime.TotalSeconds:F0} seconds before requesting a new code");
                 }
 
-                var verificationCode = GenerateEmailVerificationCode();
+                var verificationCode = GenerateEmailVerificationToken();
                 var expirationMinutes = int.Parse(_configuration["EmailVerification:CodeExpirationMinutes"] ?? "30");
                 var expiresAt = DateTime.UtcNow.AddMinutes(expirationMinutes);
 
@@ -736,7 +731,7 @@ namespace eVeterinarskaStanicaServices
                 _context.EmailVerificationCodes.Add(emailVerification);
                 await _context.SaveChangesAsync();
 
-                var emailSent = await _emailService.SendEmailVerificationCodeAsync(
+                var emailSent = await _emailService.SendEmailVerificationLinkAsync(
                     user.Email,
                     verificationCode,
                     $"{user.FirstName} {user.LastName}".Trim()
@@ -757,6 +752,17 @@ namespace eVeterinarskaStanicaServices
         {
             var random = new Random();
             return random.Next(100000, 999999).ToString();
+        }
+
+        private string GenerateEmailVerificationToken()
+        {
+            var bytes = new byte[32];
+            using var rng = RandomNumberGenerator.Create();
+            rng.GetBytes(bytes);
+            return Convert.ToBase64String(bytes)
+                .Replace("+", "-")
+                .Replace("/", "_")
+                .TrimEnd('=');
         }
 
         public async Task<ServiceResult<User>> GetUserByIdAsync(int userId)

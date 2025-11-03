@@ -39,5 +39,14 @@ namespace eVeterinarskaStanicaServices
         /// <param name="userName">User's name for personalization</param>
         /// <returns>True if email sent successfully</returns>
         Task<bool> SendEmailVerificationCodeAsync(string email, string code, string userName);
+
+        /// <summary>
+        /// Send email verification link instead of numeric code
+        /// </summary>
+        /// <param name="email">User's email address</param>
+        /// <param name="token">Secure verification token</param>
+        /// <param name="userName">User's name for personalization</param>
+        /// <returns>True if email sent successfully</returns>
+        Task<bool> SendEmailVerificationLinkAsync(string email, string token, string userName);
     }
 }

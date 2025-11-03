@@ -15,7 +15,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("veterinarskaStanica.WebAPI")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+85cc67042abe2ffa164b0aea8ae824a1e6581d0c")]
 [assembly: System.Reflection.AssemblyProductAttribute("veterinarskaStanica.WebAPI")]
 [assembly: System.Reflection.AssemblyTitleAttribute("veterinarskaStanica.WebAPI")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

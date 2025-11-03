@@ -197,6 +197,13 @@ namespace eVeterinarskaStanicaServices
             return await SendEmailAsync(email, subject, body);
         }
 
+        public async Task<bool> SendEmailVerificationLinkAsync(string email, string token, string userName)
+        {
+            var subject = "Verify Your Email Address - 4Paw Veterinary Clinic";
+            var body = GetEmailVerificationLinkTemplate(token, userName);
+            return await SendEmailAsync(email, subject, body);
+        }
+
         private string GetEmailVerificationTemplate(string code, string userName)
         {
             return $@"
@@ -250,6 +257,70 @@ namespace eVeterinarskaStanicaServices
             </ul>
             
             <p>If you have any questions or need assistance, please don't hesitate to contact our support team.</p>
+            
+            <p>Best regards,<br>
+            <strong>4Paw Veterinary Clinic Team</strong></p>
+        </div>
+        <div class='footer'>
+            <p>This is an automated message, please do not reply to this email.</p>
+            <p>© 2024 4Paw Veterinary Clinic. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>";
+        }
+
+        private string GetEmailVerificationLinkTemplate(string token, string userName)
+        {
+            var verifyUrl = $"{_configuration["App:BaseUrl"]}/api/Auth/verify-email?token={WebUtility.UrlEncode(token)}";
+
+            return $@"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <title>Email Verification - 4Paw Veterinary Clinic</title>
+    <style>
+        body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f4f7fa; }}
+        .container {{ max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }}
+        .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; }}
+        .header h1 {{ margin: 0; font-size: 28px; font-weight: 300; }}
+        .content {{ padding: 40px 30px; }}
+        .button {{ display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 25px; font-weight: 500; margin: 20px 0; }}
+        .footer {{ background-color: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #6c757d; }}
+        .warning {{ background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; padding: 15px; margin: 20px 0; color: #856404; }}
+        .url {{ word-break: break-all; color: #666; }}
+    </style>
+    
+</head>
+<body>
+    <div class='container'>
+        <div class='header'>
+            <h1>🐾 Welcome to 4Paw!</h1>
+        </div>
+        <div class='content'>
+            <h2>Hello {userName}!</h2>
+            
+            <p>Thank you for registering with <strong>4Paw Veterinary Clinic</strong>! To complete your registration and verify your email address, please click the button below:</p>
+            
+            <table role='presentation' cellspacing='0' cellpadding='0' border='0' align='center' style='margin:20px 0;'>
+                <tr>
+                    <td align='center' bgcolor='#667eea' style='border-radius: 25px;'>
+                        <a href='{verifyUrl}' target='_blank' rel='noopener noreferrer'
+                           style='font-size:16px; line-height:16px; font-weight:600; color:#ffffff; text-decoration:none; padding:14px 28px; display:inline-block; border-radius:25px; background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);'>
+                            Verify My Email
+                        </a>
+                    </td>
+                </tr>
+            </table>
+            
+            <p>If the button doesn't work, copy and paste this link into your browser:</p>
+            <p class='url'>{verifyUrl}</p>
+            
+            <div class='warning'>
+                <strong>⚠️ Important:</strong> This link will expire in 30 minutes. If you didn't request this verification, please ignore this email.
+            </div>
             
             <p>Best regards,<br>
             <strong>4Paw Veterinary Clinic Team</strong></p>

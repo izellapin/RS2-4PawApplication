@@ -120,7 +120,15 @@ namespace veterinarskaStanica.WebAPI
             using (var scope = app.Services.CreateScope())
             {
                 var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                context.Database.Migrate();
+                try
+                {
+                    context.Database.Migrate();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Migration warning: {ex.Message}");
+                    // Ako već postoje tabele, ignorisiš
+                }
 
                 try
                 {

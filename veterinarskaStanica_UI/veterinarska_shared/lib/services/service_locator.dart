@@ -31,7 +31,7 @@ class ServiceLocator {
     if (_isInitialized) return;
     
     if (kDebugMode) {
-      print('🔧 ServiceLocator: Initializing services...');
+      print('ServiceLocator: Initializing services...');
     }
     
     _apiClient = ApiClient();
@@ -39,14 +39,14 @@ class ServiceLocator {
     _isInitialized = true;
     
     if (kDebugMode) {
-      print('✅ ServiceLocator: Services initialized successfully');
+      print('ServiceLocator: Services initialized successfully');
     }
   }
 
   /// Reset and reinitialize all services (useful when network config changes)
   Future<void> reset() async {
     if (kDebugMode) {
-      print('🔄 ServiceLocator: Resetting services...');
+      print('ServiceLocator: Resetting services...');
     }
     
     _apiClient = null;
@@ -56,9 +56,9 @@ class ServiceLocator {
     await initialize();
     
     if (kDebugMode) {
-      print('✅ ServiceLocator: Services reset complete');
-      print('🔧 New ApiClient created with baseUrl: ${_apiClient?.baseUrl}');
-      print('🔧 ServiceLocator reset at: ${DateTime.now()}');
+      print('ServiceLocator: Services reset complete');
+      print('New ApiClient created with baseUrl: ${_apiClient?.baseUrl}');
+      print('ServiceLocator reset at: ${DateTime.now()}');
     }
   }
 }

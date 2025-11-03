@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:veterinarska_shared/veterinarska_shared.dart';
 
-// Uklonjen TimeSpan helper - backend sada prima HH:mm stringove
-
 class AppointmentScreen extends StatefulWidget {
   final UserRole userRole;
 
@@ -52,11 +50,9 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
 
       if (widget.userRole == UserRole.admin) {
         debugPrint('📋 Loading ALL appointments for admin...');
-        // Admin vidi sve termine
         appointments = await apiClient.getAppointments();
       } else {
         debugPrint('📋 Loading MY appointments for veterinarian...');
-        // Veterinar vidi samo svoje termine
         appointments = await apiClient.getMyAppointments();
       }
 
@@ -66,7 +62,6 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
         _isLoading = false;
       });
 
-      // Ponovo primeni postojeći filter ako postoji
       if (_filterDate != null) {
         _filterAppointmentsByDate(_filterDate);
       } else {
@@ -84,14 +79,11 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
         debugPrint('   Details: ${e.details}');
       }
       
-      // Try to reset ServiceLocator and retry once
       debugPrint('🔄 Resetting ServiceLocator and retrying...');
       try {
-        // Reset ServiceLocator to recreate ApiClient with correct config
         await serviceLocator.reset();
         debugPrint('✅ ServiceLocator reset complete, retrying...');
         
-        // Retry loading appointments with new ApiClient
         final apiClient = serviceLocator.apiClient;
         List<Appointment> appointments;
 
@@ -179,14 +171,12 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
   Future<void> _loadPets() async {
     try {
       final apiClient = serviceLocator.apiClient;
-      // Veterinari treba da vide sve pacijente za zakazivanje termina
       final pets = await apiClient.getAllPets();
       if (!mounted) return;
       setState(() {
         _pets = pets;
       });
     } catch (e) {
-      // Silent fail for pets list; the dialog will still allow manual entry if needed
       debugPrint('Greška pri učitavanju pacijenata: $e');
     }
   }
@@ -196,7 +186,6 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
       final apiClient = serviceLocator.apiClient;
       final services = await apiClient.getServices();
       if (!mounted) return;
-      // Očekujemo listu mapa sa ključevima: id, name, price
       setState(() {
         _services = List<Map<String, dynamic>>.from(services);
       });
@@ -277,7 +266,6 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Header
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: const BoxDecoration(
@@ -335,8 +323,6 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
                     ],
                   ),
                 ),
-                
-                // Content
                 Flexible(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.all(24),
@@ -348,6 +334,41 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
                         _buildDetailRow('Veterinar', appointment.veterinarianName ?? 'Nepoznato', Icons.medical_services),
                         _buildDetailRow('Tip', appointment.typeText, Icons.category),
                         _buildDetailRow('Status', appointment.statusText, Icons.info),
+                        if (appointment.isPaid) ...[
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.green.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.green.shade600, width: 2),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.check_circle, color: Colors.green.shade600, size: 24),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'PLAĆENO',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green.shade600,
+                                  ),
+                                ),
+                                if (appointment.paymentMethod != null) ...[
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '(${appointment.paymentMethod})',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.green.shade700,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
                         _buildDetailRow('Datum', '${appointment.appointmentDate.day}.${appointment.appointmentDate.month}.${appointment.appointmentDate.year}', Icons.calendar_today),
                         _buildDetailRow('Vreme', appointment.timeRange, Icons.access_time),
                         if (appointment.reason != null)
@@ -362,8 +383,6 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
                     ),
                   ),
                 ),
-                
-                // Actions
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
@@ -501,7 +520,6 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
   }
 
   void _showEditAppointmentDialog(Appointment appointment) {
-    // TODO: Implement edit appointment dialog
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Uređivanje termina će biti implementirano uskoro'),
@@ -511,13 +529,23 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
   }
 
   void _showFinishConfirmation(Appointment appointment) {
+    final initialCost = appointment.actualCost ?? appointment.estimatedCost;
     final actualCostController = TextEditingController(
-      text: appointment.estimatedCost?.toString() ?? '',
+      text: initialCost?.toString() ?? '',
     );
     final notesController = TextEditingController(
       text: appointment.notes ?? '',
     );
     final formKey = GlobalKey<FormState>();
+    final isPaid = appointment.isPaid || (appointment.paymentMethod != null && appointment.paymentMethod!.isNotEmpty);
+    
+    debugPrint('🔍 Appointment payment status check:');
+    debugPrint('   Appointment ID: ${appointment.id}');
+    debugPrint('   Appointment Number: ${appointment.appointmentNumber}');
+    debugPrint('   isPaid (flag): ${appointment.isPaid}');
+    debugPrint('   paymentMethod: ${appointment.paymentMethod}');
+    debugPrint('   paymentDate: ${appointment.paymentDate}');
+    debugPrint('   Final isPaid check: $isPaid');
 
     showDialog(
       context: context,
@@ -537,7 +565,6 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Header
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: const BoxDecoration(
@@ -584,8 +611,6 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
                     ],
                   ),
                 ),
-                
-                // Content
                 Flexible(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.all(24),
@@ -594,6 +619,65 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          if (isPaid) ...[
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.green.shade600, width: 2),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.check_circle, color: Colors.green.shade600, size: 24),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'PLAĆENO',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.green.shade600,
+                                    ),
+                                  ),
+                                  if (appointment.paymentMethod != null) ...[
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      '(${appointment.paymentMethod})',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.green.shade700,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.blue.shade600, width: 1),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.attach_money, color: Colors.blue.shade600, size: 20),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Plaćeno: ${appointment.actualCost ?? appointment.estimatedCost ?? 0} KM',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.blue.shade700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                          ],
+                          
                           const Text(
                             'Unesite finalne detalje termina:',
                             style: TextStyle(
@@ -603,18 +687,23 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
                             ),
                           ),
                           const SizedBox(height: 20),
-                          
-                          // Actual Cost
                           TextFormField(
                             controller: actualCostController,
-                            decoration: const InputDecoration(
-                              labelText: 'Stvarni trošak (€)',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.euro),
-                              helperText: 'Unesite finalni trošak termina',
+                            enabled: !isPaid, // Disable if already paid
+                            decoration: InputDecoration(
+                              labelText: isPaid ? 'Stvarni trošak (KM) - Već plaćeno' : 'Stvarni trošak (KM)',
+                              border: const OutlineInputBorder(),
+                              prefixIcon: const Icon(Icons.attach_money),
+                              helperText: isPaid 
+                                ? 'Plaćeno ranije, cijena je zaključana' 
+                                : 'Unesite finalni trošak termina',
+                              filled: isPaid,
+                              fillColor: isPaid ? Colors.grey.shade100 : null,
                             ),
                             keyboardType: TextInputType.number,
                             validator: (value) {
+                              if (isPaid) return null;
+                              
                               if (value == null || value.isEmpty) {
                                 return 'Molimo unesite stvarni trošak';
                               }
@@ -628,8 +717,6 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
                             },
                           ),
                           const SizedBox(height: 16),
-                          
-                          // Notes
                           TextFormField(
                             controller: notesController,
                             decoration: const InputDecoration(
@@ -645,8 +732,6 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
                     ),
                   ),
                 ),
-                
-                // Actions
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
@@ -666,13 +751,15 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
                       const SizedBox(width: 12),
                       ElevatedButton(
                         onPressed: () async {
-                          if (formKey.currentState!.validate()) {
-                            final actualCost = double.tryParse(actualCostController.text) ?? 0.0;
-                            final notes = notesController.text.trim().isEmpty ? null : notesController.text.trim();
-                            
-                            Navigator.of(context).pop();
-                            await _finishAppointment(appointment.id, actualCost: actualCost, notes: notes);
+                          if (!isPaid && !formKey.currentState!.validate()) {
+                            return;
                           }
+                          
+                          final actualCost = isPaid ? null : (double.tryParse(actualCostController.text) ?? 0.0);
+                          final notes = notesController.text.trim().isEmpty ? null : notesController.text.trim();
+                          
+                          Navigator.of(context).pop();
+                          await _finishAppointment(appointment.id, actualCost: actualCost, notes: notes);
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
@@ -705,7 +792,6 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
             backgroundColor: Colors.green,
           ),
         );
-        // Refresh the appointments list
         _loadAppointments();
       }
     } catch (e) {
@@ -767,7 +853,6 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
       String errorMessage = 'Greška pri kreiranju termina';
       
       if (e is ApiError) {
-        // Prikaži poruku koju vrati backend, bez prepisivanja generičnom porukom
         errorMessage = e.message;
         print('❌ API Error details: message=${e.message}, statusCode=${e.statusCode}');
         if (e.statusCode != null && e.statusCode != 400) {

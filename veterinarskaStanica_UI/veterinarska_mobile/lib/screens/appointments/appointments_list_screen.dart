@@ -118,7 +118,8 @@ class _MobileAppointmentsListScreenState extends State<MobileAppointmentsListScr
           // Group appointments by status
           final upcomingAppointments = appointments.where((apt) => 
             apt.appointmentDate.isAfter(DateTime.now()) &&
-            apt.status != AppointmentStatus.cancelled
+            apt.status != AppointmentStatus.cancelled &&
+            apt.status != AppointmentStatus.completed
           ).toList()..sort((a, b) => a.appointmentDate.compareTo(b.appointmentDate));
           
           final pastAppointments = appointments.where((apt) => 
@@ -241,6 +242,17 @@ class _MobileAppointmentsListScreenState extends State<MobileAppointmentsListScr
                                   ],
                                 ),
                               ],
+                              const SizedBox(height: 8),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: appointment.status != AppointmentStatus.cancelled
+                                    ? TextButton.icon(
+                                        onPressed: () => _showRateVeterinarianDialog(appointment),
+                                        icon: const Icon(Icons.star, color: Color(0xFFFFC107), size: 18),
+                                        label: const Text('Ocijeni'),
+                                      )
+                                    : const SizedBox.shrink(),
+                              ),
                             ],
                           ),
                         ),
@@ -322,12 +334,42 @@ class _MobileAppointmentsListScreenState extends State<MobileAppointmentsListScr
                   ),
                   Column(
                     children: [
-                      Chip(
-                        label: Text(
-                          appointment.statusText,
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                        backgroundColor: _getStatusColor(appointment.status).withOpacity(0.2),
+                      Row(
+                        children: [
+                          Chip(
+                            label: Text(
+                              appointment.statusText,
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            backgroundColor: _getStatusColor(appointment.status).withOpacity(0.2),
+                          ),
+                          if (appointment.isPaid) ...[
+                            const SizedBox(width: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade100,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.green.shade600, width: 1.5),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.check_circle, size: 14, color: Colors.green.shade600),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'PLAĆENO',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.green.shade600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       if (isUpcoming && appointment.status == AppointmentStatus.scheduled)
                         PopupMenuButton<String>(
@@ -349,6 +391,12 @@ class _MobileAppointmentsListScreenState extends State<MobileAppointmentsListScr
                             ),
                           ],
                           child: const Icon(Icons.more_vert),
+                        ),
+                      if (!isUpcoming && appointment.status != AppointmentStatus.cancelled)
+                        TextButton.icon(
+                          onPressed: () => _showRateVeterinarianDialog(appointment),
+                          icon: const Icon(Icons.star, color: Color(0xFFFFC107), size: 18),
+                          label: const Text('Ocijeni'),
                         ),
                     ],
                   ),
@@ -567,6 +615,79 @@ class _MobileAppointmentsListScreenState extends State<MobileAppointmentsListScr
     return '${date.day}.${date.month}.${date.year}';
   }
 
+  Future<void> _showRateVeterinarianDialog(Appointment appointment) async {
+    int selectedRating = 5;
+    await showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setStateDialog) {
+            return AlertDialog(
+              title: const Text('Ocijenite veterinara'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (appointment.veterinarianName != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(appointment.veterinarianName!, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (index) {
+                      final filled = index < selectedRating;
+                      return IconButton(
+                        icon: Icon(filled ? Icons.star : Icons.star_border, color: filled ? const Color(0xFFFFC107) : Colors.grey),
+                        onPressed: () => setStateDialog(() => selectedRating = index + 1),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 8),
+                  Text('Ocjena: $selectedRating/5'),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('Zatvori'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    try {
+                      final api = serviceLocator.apiClient;
+                      await api.createVeterinarianReview(
+                        veterinarianId: appointment.veterinarianId,
+                        rating: selectedRating,
+                        petName: appointment.petName,
+                        title: appointment.serviceName,
+                        comment: 'Ocjena nakon završenog termina',
+                      );
+                      if (mounted) {
+                        Navigator.of(ctx).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Hvala na ocjeni!'), backgroundColor: Colors.green),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Greška pri ocjenjivanju: $e'), backgroundColor: Colors.red),
+                        );
+                      }
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2E7D32)),
+                  child: const Text('Pošalji'),
+                )
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _showAllPastAppointments(List<Appointment> appointments) {
     showDialog(
       context: context,
@@ -615,12 +736,26 @@ class _MobileAppointmentsListScreenState extends State<MobileAppointmentsListScr
                         ),
                     ],
                   ),
-                  trailing: Chip(
-                    label: Text(
-                      appointment.statusText,
-                      style: const TextStyle(fontSize: 10),
-                    ),
-                    backgroundColor: _getStatusColor(appointment.status).withOpacity(0.2),
+                  trailing: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Chip(
+                        label: Text(
+                          appointment.statusText,
+                          style: const TextStyle(fontSize: 10),
+                        ),
+                        backgroundColor: _getStatusColor(appointment.status).withOpacity(0.2),
+                      ),
+                      if (appointment.status != AppointmentStatus.cancelled)
+                        TextButton.icon(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            _showRateVeterinarianDialog(appointment);
+                          },
+                          icon: const Icon(Icons.star, size: 16, color: Color(0xFFFFC107)),
+                          label: const Text('Ocijeni'),
+                        ),
+                    ],
                   ),
                   onTap: () {
                     Navigator.of(context).pop();

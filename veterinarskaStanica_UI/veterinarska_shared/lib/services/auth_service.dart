@@ -24,19 +24,19 @@ class AuthService extends ChangeNotifier {
       final token = prefs.getString('access_token');
       
       if (token != null && token.isNotEmpty) {
-        print('🔍 Validating existing token...');
+        print('Validating existing token...');
         // Try to get current user to validate token
         try {
           _currentUser = await _apiClient.getCurrentUser();
           _isLoggedIn = true;
-          print('✅ Token is valid, user authenticated');
+          print('Token is valid, user authenticated');
         } catch (e) {
-          print('❌ Token validation failed: $e');
+          print('Token validation failed: $e');
           // Check if it's a network error (semaphore timeout, connection refused, etc.)
           if (e.toString().contains('semaphore timeout') || 
               e.toString().contains('connection') ||
               e.toString().contains('timeout')) {
-            print('🌐 Network error during token validation - keeping user logged in');
+            print('Network error during token validation - keeping user logged in');
             // Keep user logged in for network errors, they can retry later
             _isLoggedIn = true;
             // Don't clear tokens for network issues
@@ -46,12 +46,12 @@ class AuthService extends ChangeNotifier {
           }
         }
       } else {
-        print('ℹ️ No token found, user needs to login');
+        print('No token found, user needs to login');
         _isLoggedIn = false;
         _currentUser = null;
       }
     } catch (e) {
-      print('❌ Auth initialization error: $e');
+      print('Auth initialization error: $e');
       await logout(); // Clear everything on error
     } finally {
       _isLoading = false;
@@ -68,7 +68,7 @@ class AuthService extends ChangeNotifier {
       await prefs.setString('access_token', authResponse.accessToken);
       await prefs.setString('refresh_token', authResponse.refreshToken);
       
-      print('🔑 Stored new access token: ${authResponse.accessToken.substring(0, 20)}...');
+      print('Stored new access token: ${authResponse.accessToken.substring(0, 20)}...');
       
       // Set user data - backend returns user data directly in response, not nested
       _currentUser = authResponse.user ?? {};
@@ -88,15 +88,15 @@ class AuthService extends ChangeNotifier {
       
       _isLoggedIn = true;
       
-      print('✅ Login successful, user data: $_currentUser');
+      print('Login successful, user data: $_currentUser');
       notifyListeners();
     } catch (e) {
-      print('❌ Login error: $e');
+      print('Login error: $e');
       // Check if it's a network error
       if (e.toString().contains('semaphore timeout') || 
           e.toString().contains('connection') ||
           e.toString().contains('timeout')) {
-        print('🌐 Network error during login - please check your connection');
+        print('Network error during login - please check your connection');
         throw Exception('Greška konekcije sa serverom. Molimo provjerite internet konekciju i pokušajte ponovo.');
       }
       rethrow;
@@ -107,7 +107,7 @@ class AuthService extends ChangeNotifier {
     try {
       final response = await _apiClient.register(firstName, lastName, email, username, password, phoneNumber: phoneNumber, address: address, role: role);
       
-      print('✅ Registration successful: $response');
+      print('Registration successful: $response');
       // Registration doesn't automatically log in the user - they need to verify email first
       // So we don't set _isLoggedIn = true here
     } catch (e) {
@@ -119,7 +119,7 @@ class AuthService extends ChangeNotifier {
     try {
       final response = await _apiClient.verifyEmail(email, verificationCode);
       
-      print('✅ Email verification successful: $response');
+      print('Email verification successful: $response');
       // Email verification doesn't automatically log in the user - they need to login after verification
       // So we don't set _isLoggedIn = true here
     } catch (e) {
@@ -130,7 +130,7 @@ class AuthService extends ChangeNotifier {
   Future<void> resendVerificationCode(String email) async {
     try {
       final response = await _apiClient.resendVerificationCode(email);
-      print('✅ Verification code resent successfully: $response');
+      print('Verification code resent successfully: $response');
     } catch (e) {
       rethrow;
     }
@@ -145,7 +145,7 @@ class AuthService extends ChangeNotifier {
       await _clearTokens();
       _isLoggedIn = false;
       _currentUser = null;
-      print('🔑 Logout completed, tokens cleared');
+      print('Logout completed, tokens cleared');
       notifyListeners();
     }
   }
@@ -154,13 +154,13 @@ class AuthService extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('access_token');
     await prefs.remove('refresh_token');
-    print('🔑 Cleared tokens from SharedPreferences');
+    print('Cleared tokens from SharedPreferences');
   }
 
   Future<String?> getAccessToken() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
-    print('🔑 Getting access token: ${token?.substring(0, 20)}...');
+    print('Getting access token: ${token?.substring(0, 20)}...');
     return token;
   }
 
@@ -177,11 +177,39 @@ class AuthService extends ChangeNotifier {
 
   // Force refresh token - clear and re-login
   Future<void> forceRefreshToken() async {
-    print('🔄 Force refreshing token...');
+    print('Force refreshing token...');
     await _clearTokens();
     _isLoggedIn = false;
     _currentUser = null;
-    print('🔑 Tokens cleared, user logged out');
+    print('Tokens cleared, user logged out');
     notifyListeners();
+  }
+
+  // Refresh current user data from API and notify listeners
+  Future<void> refreshCurrentUser() async {
+    try {
+      final me = await _apiClient.getCurrentUser();
+      _currentUser = me;
+      _isLoggedIn = true;
+      notifyListeners();
+    } catch (e) {
+      print('Failed to refresh current user: $e');
+    }
+  }
+
+  // Update profile then refresh local user cache
+  Future<void> updateProfile({String? firstName, String? lastName, String? phoneNumber, String? address, String? password, String? currentPassword}) async {
+    final data = <String, dynamic>{};
+    if (firstName != null) data['firstName'] = firstName;
+    if (lastName != null) data['lastName'] = lastName;
+    if (phoneNumber != null) data['phoneNumber'] = phoneNumber;
+    if (address != null) data['address'] = address;
+    if (password != null) {
+      data['password'] = password;
+      if (currentPassword != null) data['currentPassword'] = currentPassword;
+    }
+
+    await _apiClient.updateCurrentUser(data);
+    await refreshCurrentUser();
   }
 }

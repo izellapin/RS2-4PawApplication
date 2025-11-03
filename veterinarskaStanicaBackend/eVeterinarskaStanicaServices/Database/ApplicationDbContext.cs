@@ -387,7 +387,8 @@ namespace eVeterinarskaStanicaServices.Database
             modelBuilder.Entity<EmailVerificationCode>(entity =>
             {
                 entity.HasKey(e => e.Id);
-                entity.Property(e => e.Code).HasMaxLength(6);
+                // Switch to link-based token: allow longer URL-safe token
+                entity.Property(e => e.Code).HasMaxLength(128);
                 entity.Property(e => e.IpAddress).HasMaxLength(100);
                 entity.Property(e => e.UserAgent).HasMaxLength(500);
 

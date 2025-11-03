@@ -33,7 +33,7 @@ class _FinancialDashboardState extends State<FinancialDashboard> {
 
   // Force refresh token i podataka
   Future<void> _forceRefreshToken() async {
-    print('🔄 Force refreshing token...');
+    print('Force refreshing token...');
     await serviceLocator.authService.forceRefreshToken();
     // Vrati korisnika na login ekran
     if (mounted) {
@@ -45,32 +45,32 @@ class _FinancialDashboardState extends State<FinancialDashboard> {
     setState(() => _isLoading = true);
     
     try {
-      print('🚀 Loading data for role: ${widget.userRole} (attempt ${_retryCount + 1})');
+      print('Loading data for role: ${widget.userRole} (attempt ${_retryCount + 1})');
       if (widget.userRole == UserRole.admin) {
-        print('👑 Loading admin financial summary...');
+        print('Loading admin financial summary...');
         _financialSummary = await _financialService.getAdminFinancialSummary();
-        print('✅ Admin data loaded: ${_financialSummary != null}');
+        print('Admin data loaded: ${_financialSummary != null}');
         
         // Učitaj dodatne podatke za admin panel
-        print('🔧 Loading admin revenue by services...');
+        print('Loading admin revenue by services...');
         _adminRevenueByServices = await _financialService.getAdminRevenueByServices();
-        print('✅ Admin revenue by services loaded: ${_adminRevenueByServices?.length ?? 0} services');
+        print('Admin revenue by services loaded: ${_adminRevenueByServices?.length ?? 0} services');
       } else {
-        print('👨‍⚕️ Loading veterinarian stats...');
+        print('Loading veterinarian stats...');
         _veterinarianStats = await _financialService.getVeterinarianStats();
-        print('✅ Veterinarian data loaded: ${_veterinarianStats != null}');
+        print('Veterinarian data loaded: ${_veterinarianStats != null}');
       }
       
       // Reset retry count on success
       _retryCount = 0;
     } catch (e, stackTrace) {
-      print('💥 Error in _loadData: $e');
-      print('📚 Stack trace: $stackTrace');
+      print('Error in _loadData: $e');
+      print('Stack trace: $stackTrace');
       
       // Check if we should retry
       if (_retryCount < _maxRetries && e.toString().contains('500')) {
         _retryCount++;
-        print('🔄 Retrying in 2 seconds... (attempt ${_retryCount + 1}/$_maxRetries)');
+        print('Retrying in 2 seconds... (attempt ${_retryCount + 1}/$_maxRetries)');
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -193,6 +193,101 @@ class _FinancialDashboardState extends State<FinancialDashboard> {
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildRevenueBarChart(List<DailyRevenue> data) {
+    // Ako nema podataka ili su svi podaci 0, generiši mock podatke
+    final hasRealData = data.isNotEmpty && data.any((d) => d.revenue > 0);
+    final chartData = hasRealData ? data : _generateMockDailyRevenue();
+
+    final maxY = chartData.isEmpty
+        ? 0.0
+        : chartData.map((e) => e.revenue).reduce((a, b) => a > b ? a : b) * 1.1;
+
+    return Container(
+      height: 300,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Ukupni dnevni prihodi (zadnjih 60 dana)${!hasRealData ? " - Primjer podataka" : ""}',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 20),
+          Expanded(
+            child: chartData.isEmpty
+                ? const Center(
+                    child: Text(
+                      'No revenue data available',
+                      style: TextStyle(fontSize: 14, color: Colors.grey),
+                    ),
+                  )
+                : BarChart(
+                    BarChartData(
+                      alignment: BarChartAlignment.spaceAround,
+                      maxY: maxY,
+                      barTouchData: BarTouchData(enabled: false),
+                      titlesData: FlTitlesData(
+                        show: true,
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 30,
+                            interval: 5,
+                            getTitlesWidget: (value, meta) {
+                              if (value.toInt() < chartData.length) {
+                                final date = chartData[value.toInt()].date;
+                                return Text('${date.day}/${date.month}');
+                              }
+                              return const Text('');
+                            },
+                          ),
+                        ),
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 60,
+                            getTitlesWidget: (value, meta) {
+                              return Text('${(value / 1000).toStringAsFixed(0)}k');
+                            },
+                          ),
+                        ),
+                        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      ),
+                      borderData: FlBorderData(show: false),
+                      barGroups: chartData.asMap().entries.map((entry) {
+                        return BarChartGroupData(
+                          x: entry.key,
+                          barRods: [
+                            BarChartRodData(
+                              toY: entry.value.revenue,
+                              color: Colors.green,
+                              width: 12,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ],
+                        );
+                      }).toList(),
+                    ),
+                  ),
+          ),
+        ],
+      ),
     );
   }
 

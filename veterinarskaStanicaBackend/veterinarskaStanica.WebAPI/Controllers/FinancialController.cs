@@ -45,9 +45,8 @@ namespace veterinarskaStanica.WebAPI.Controllers
                 // Dnevni prihod (danas)
                 var todayRevenue = await _context.Appointments
                     .Where(a => a.AppointmentDate.Date == today && 
-                               a.Status == AppointmentStatus.Completed && 
-                               a.ActualCost.HasValue)
-                    .SumAsync(a => a.ActualCost ?? 0);
+                               a.Status == AppointmentStatus.Completed)
+                    .SumAsync(a => (a.ActualCost ?? a.EstimatedCost) ?? 0);
 
                 var todayAppointments = await _context.Appointments
                     .CountAsync(a => a.AppointmentDate.Date == today);
@@ -55,24 +54,21 @@ namespace veterinarskaStanica.WebAPI.Controllers
                 // Mesečni prihod
                 var monthlyRevenue = await _context.Appointments
                     .Where(a => a.AppointmentDate >= thisMonth && 
-                               a.Status == AppointmentStatus.Completed && 
-                               a.ActualCost.HasValue)
-                    .SumAsync(a => a.ActualCost ?? 0);
+                               a.Status == AppointmentStatus.Completed)
+                    .SumAsync(a => (a.ActualCost ?? a.EstimatedCost) ?? 0);
 
                 var lastMonthRevenue = await _context.Appointments
                     .Where(a => a.AppointmentDate >= lastMonth && 
                                a.AppointmentDate < thisMonth && 
-                               a.Status == AppointmentStatus.Completed && 
-                               a.ActualCost.HasValue)
-                    .SumAsync(a => a.ActualCost ?? 0);
+                               a.Status == AppointmentStatus.Completed)
+                    .SumAsync(a => (a.ActualCost ?? a.EstimatedCost) ?? 0);
 
                 var monthlyGrowth = lastMonthRevenue > 0 ? 
                     ((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : 0;
 
                 // Prosečan termin - guard za prazne kolekcije
                 var appointmentsWithCost = await _context.Appointments
-                    .Where(a => a.Status == AppointmentStatus.Completed && 
-                               a.ActualCost.HasValue)
+                    .Where(a => a.Status == AppointmentStatus.Completed)
                     .ToListAsync();
                 
                 // DEBUG: Log database info
@@ -91,22 +87,17 @@ namespace veterinarskaStanica.WebAPI.Controllers
                 var avgAppointmentCost = 0.0m;
                 if (appointmentsWithCost.Any())
                 {
-                    avgAppointmentCost = appointmentsWithCost.Average(a => a.ActualCost ?? 0);
+                    avgAppointmentCost = appointmentsWithCost.Average(a => (a.ActualCost ?? a.EstimatedCost) ?? 0);
                 }
 
                 // Godišnji rast
                 var thisYearRevenue = await _context.Appointments
-                    .Where(a => a.AppointmentDate >= thisYear && 
-                               a.Status == AppointmentStatus.Completed && 
-                               a.ActualCost.HasValue)
-                    .SumAsync(a => a.ActualCost ?? 0);
+                    .Where(a => a.AppointmentDate >= thisYear && a.IsPaid)
+                    .SumAsync(a => (a.ActualCost ?? a.EstimatedCost) ?? 0);
 
                 var lastYearRevenue = await _context.Appointments
-                    .Where(a => a.AppointmentDate >= lastYear && 
-                               a.AppointmentDate < thisYear && 
-                               a.Status == AppointmentStatus.Completed && 
-                               a.ActualCost.HasValue)
-                    .SumAsync(a => a.ActualCost ?? 0);
+                    .Where(a => a.AppointmentDate >= lastYear && a.AppointmentDate < thisYear && a.IsPaid)
+                    .SumAsync(a => (a.ActualCost ?? a.EstimatedCost) ?? 0);
 
                 var yearlyGrowth = lastYearRevenue > 0 ? 
                     ((thisYearRevenue - lastYearRevenue) / lastYearRevenue) * 100 : 0;
@@ -116,14 +107,14 @@ namespace veterinarskaStanica.WebAPI.Controllers
                 
                 // Debug: Proverim sve completed termine
                 var allCompletedAppointments = await _context.Appointments
-                    .Where(a => a.Status == AppointmentStatus.Completed && a.ActualCost.HasValue)
-                    .Select(a => new { a.AppointmentDate, a.ActualCost })
+                    .Where(a => a.IsPaid)
+                    .Select(a => new { a.AppointmentDate, Amount = (a.ActualCost ?? a.EstimatedCost) })
                     .ToListAsync();
                 
                 Console.WriteLine($"🔍 Total completed appointments: {allCompletedAppointments.Count}");
                 foreach (var apt in allCompletedAppointments)
                 {
-                    Console.WriteLine($"📅 Appointment: {apt.AppointmentDate:yyyy-MM-dd} - Cost: {apt.ActualCost}");
+                    Console.WriteLine($"📅 Appointment: {apt.AppointmentDate:yyyy-MM-dd} - Amount: {apt.Amount}");
                 }
                 
                 for (int i = 59; i >= 0; i--)
@@ -131,9 +122,8 @@ namespace veterinarskaStanica.WebAPI.Controllers
                     var date = today.AddDays(-i);
                     var revenue = await _context.Appointments
                         .Where(a => a.AppointmentDate.Date == date && 
-                                   a.Status == AppointmentStatus.Completed && 
-                                   a.ActualCost.HasValue)
-                        .SumAsync(a => a.ActualCost ?? 0);
+                                   a.Status == AppointmentStatus.Completed)
+                        .SumAsync(a => (a.ActualCost ?? a.EstimatedCost) ?? 0);
                     
                     if (revenue > 0)
                     {
@@ -147,20 +137,30 @@ namespace veterinarskaStanica.WebAPI.Controllers
                     });
                 }
 
-                // Prihod po uslugama
                 var revenueByService = await _context.Appointments
-                    .Where(a => a.Status == AppointmentStatus.Completed && 
-                               a.ActualCost.HasValue && 
-                               a.Service != null)
-                    .GroupBy(a => a.Service!.Name)
+                    .Where(a => a.Status == AppointmentStatus.Completed)
+                    .Select(a => new
+                    {
+                        Name = (a.Reason != null && a.Reason != "") ? a.Reason! :
+                               (a.Service != null && a.Service.Name != null && a.Service.Name != "" ? a.Service.Name :
+                                 (a.Type == AppointmentType.Checkup ? "Pregled" :
+                                  a.Type == AppointmentType.Vaccination ? "Vakcinacija" :
+                                  a.Type == AppointmentType.Surgery ? "Operacija" :
+                                  a.Type == AppointmentType.Emergency ? "Hitno" :
+                                  a.Type == AppointmentType.Grooming ? "Šišanje/Njega" :
+                                  a.Type == AppointmentType.Dental ? "Stomatologija" :
+                                  a.Type == AppointmentType.Consultation ? "Konsultacija" :
+                                  /* AppointmentType.FollowUp */ "Kontrola")),
+                        Amount = (a.ActualCost ?? a.EstimatedCost) ?? 0
+                    })
+                    .GroupBy(x => x.Name)
                     .Select(g => new RevenueByService
                     {
                         ServiceName = g.Key,
-                        Revenue = g.Sum(a => a.ActualCost ?? 0),
+                        Revenue = g.Sum(i => i.Amount),
                         Count = g.Count()
                     })
                     .OrderByDescending(r => r.Revenue)
-                    .Take(10)
                     .ToListAsync();
 
                 // Top klijenti
@@ -239,11 +239,8 @@ namespace veterinarskaStanica.WebAPI.Controllers
 
                 // Prihod ovaj mesec
                 var monthlyRevenue = await _context.Appointments
-                    .Where(a => a.VeterinarianId == veterinarianId && 
-                               a.AppointmentDate >= thisMonth && 
-                               a.Status == AppointmentStatus.Completed && 
-                               a.ActualCost.HasValue)
-                    .SumAsync(a => a.ActualCost ?? 0);
+                    .Where(a => a.VeterinarianId == veterinarianId && a.AppointmentDate >= thisMonth && a.IsPaid)
+                    .SumAsync(a => (a.ActualCost ?? a.EstimatedCost) ?? 0);
 
                 // Prosečan termin - guard za prazne kolekcije
                 var appointmentsWithCost = await _context.Appointments
@@ -387,78 +384,32 @@ namespace veterinarskaStanica.WebAPI.Controllers
             {
                 _logger.LogInformation("🔍 Getting revenue by services for all veterinarians (admin view)");
 
-                // Prvo pokušaj da nađeš termine sa uslugom
+                // Grupisanje kao kod veterinara: Reason -> Service.Name -> Tip pregleda; bez limita i bez "Ostalo"
                 var revenueByService = await _context.Appointments
-                    .Where(a => a.Status == AppointmentStatus.Completed && 
-                               a.ActualCost.HasValue && 
-                               a.Service != null)
-                    .GroupBy(a => a.Service!.Name)
+                    .Where(a => a.Status == AppointmentStatus.Completed)
+                    .Select(a => new
+                    {
+                        Name = (a.Reason != null && a.Reason != "") ? a.Reason! :
+                               (a.Service != null && a.Service.Name != null && a.Service.Name != "" ? a.Service.Name :
+                                 (a.Type == AppointmentType.Checkup ? "Pregled" :
+                                  a.Type == AppointmentType.Vaccination ? "Vakcinacija" :
+                                  a.Type == AppointmentType.Surgery ? "Operacija" :
+                                  a.Type == AppointmentType.Emergency ? "Hitno" :
+                                  a.Type == AppointmentType.Grooming ? "Šišanje/Njega" :
+                                  a.Type == AppointmentType.Dental ? "Stomatologija" :
+                                  a.Type == AppointmentType.Consultation ? "Konsultacija" :
+                                  /* AppointmentType.FollowUp */ "Kontrola")),
+                        Amount = (a.ActualCost ?? a.EstimatedCost) ?? 0
+                    })
+                    .GroupBy(x => x.Name)
                     .Select(g => new RevenueByService
                     {
                         ServiceName = g.Key,
-                        Revenue = g.Sum(a => a.ActualCost ?? 0),
+                        Revenue = g.Sum(i => i.Amount),
                         Count = g.Count()
                     })
                     .OrderByDescending(r => r.Revenue)
-                    .Take(10)
                     .ToListAsync();
-
-                _logger.LogInformation($"📊 Found {revenueByService.Count} services with Service assigned");
-
-                // Ako nema termina sa uslugom, grupiši po TIPU termina
-                if (revenueByService.Count == 0)
-                {
-                    _logger.LogInformation($"🔄 No services found, grouping by appointment type...");
-                    
-                    revenueByService = await _context.Appointments
-                        .Where(a => a.Status == AppointmentStatus.Completed)
-                        .GroupBy(a => a.Type)
-                        .Select(g => new RevenueByService
-                        {
-                            ServiceName = g.Key == AppointmentType.Checkup ? "Pregled" :
-                                         g.Key == AppointmentType.Vaccination ? "Vakcinacija" :
-                                         g.Key == AppointmentType.Surgery ? "Operacija" :
-                                         g.Key == AppointmentType.Emergency ? "Hitno" :
-                                         g.Key == AppointmentType.Grooming ? "Šišanje/Njega" :
-                                         g.Key == AppointmentType.Dental ? "Stomatologija" :
-                                         g.Key == AppointmentType.Consultation ? "Konsultacija" :
-                                         g.Key == AppointmentType.FollowUp ? "Kontrola" : "Ostalo",
-                            Revenue = g.Sum(a => a.ActualCost ?? 0),
-                            Count = g.Count()
-                        })
-                        .OrderByDescending(r => r.Revenue)
-                        .Take(10)
-                        .ToListAsync();
-                    
-                    _logger.LogInformation($"📊 Found {revenueByService.Count} appointment types");
-                }
-                
-                // Ako JOŠ UVIJEK nema, onda prikaži SVE termine (bilo koji status)
-                if (revenueByService.Count == 0)
-                {
-                    _logger.LogInformation($"🔄 Still no data, showing ALL appointments...");
-                    
-                    revenueByService = await _context.Appointments
-                        .GroupBy(a => a.Type)
-                        .Select(g => new RevenueByService
-                        {
-                            ServiceName = g.Key == AppointmentType.Checkup ? "Pregled" :
-                                         g.Key == AppointmentType.Vaccination ? "Vakcinacija" :
-                                         g.Key == AppointmentType.Surgery ? "Operacija" :
-                                         g.Key == AppointmentType.Emergency ? "Hitno" :
-                                         g.Key == AppointmentType.Grooming ? "Šišanje/Njega" :
-                                         g.Key == AppointmentType.Dental ? "Stomatologija" :
-                                         g.Key == AppointmentType.Consultation ? "Konsultacija" :
-                                         g.Key == AppointmentType.FollowUp ? "Kontrola" : "Ostalo",
-                            Revenue = g.Sum(a => a.ActualCost ?? 0),
-                            Count = g.Count()
-                        })
-                        .OrderByDescending(r => r.Count) // Sortiraj po broju, ne prihodu
-                        .Take(10)
-                        .ToListAsync();
-                    
-                    _logger.LogInformation($"📊 Found {revenueByService.Count} total appointments");
-                }
 
                 return Ok(revenueByService);
             }
@@ -493,51 +444,81 @@ namespace veterinarskaStanica.WebAPI.Controllers
                 // Uzmi SVE termine veterinara (ne samo ovaj mjesec)
                 _logger.LogInformation($"🔍 Getting top services for veterinarian ID: {veterinarianId}");
 
-                // Prvo pokušaj da nađeš termine sa uslugom
-                var topServices = await _context.Appointments
-                    .Where(a => a.VeterinarianId == veterinarianId && 
-                               a.Status == AppointmentStatus.Completed && 
-                               a.Service != null)
-                    .GroupBy(a => a.Service!.Name)
+                // Primarni pristup: uzmi potrebne podatke iz baze, pa grupiši u memoriji
+                var rawItems = await _context.Appointments
+                    .Where(a => a.VeterinarianId == veterinarianId && a.Status == AppointmentStatus.Completed)
+                    .Select(a => new
+                    {
+                        ServiceName = a.Service != null ? a.Service.Name : null,
+                        a.Reason,
+                        a.Type,
+                        Amount = (a.ActualCost ?? a.EstimatedCost) ?? 0
+                    })
+                    .ToListAsync();
+
+                string MapType(AppointmentType t)
+                {
+                    return t == AppointmentType.Checkup ? "Pregled" :
+                           t == AppointmentType.Vaccination ? "Vakcinacija" :
+                           t == AppointmentType.Surgery ? "Operacija" :
+                           t == AppointmentType.Emergency ? "Hitno" :
+                           t == AppointmentType.Grooming ? "Šišanje/Njega" :
+                           t == AppointmentType.Dental ? "Stomatologija" :
+                           t == AppointmentType.Consultation ? "Konsultacija" :
+                           t == AppointmentType.FollowUp ? "Kontrola" : t.ToString();
+                }
+
+                var topServices = rawItems
+                    .Select(x => new
+                    {
+                        Name = !string.IsNullOrWhiteSpace(x.ServiceName)
+                            ? x.ServiceName!
+                            : (!string.IsNullOrWhiteSpace(x.Reason) ? x.Reason! : MapType(x.Type)),
+                        x.Amount
+                    })
+                    .GroupBy(x => x.Name)
                     .Select(g => new RevenueByService
                     {
                         ServiceName = g.Key,
-                        Revenue = g.Sum(a => a.ActualCost ?? 0),
+                        Revenue = g.Sum(i => i.Amount),
                         Count = g.Count()
                     })
                     .OrderByDescending(r => r.Revenue)
                     .Take(5)
-                    .ToListAsync();
+                    .ToList();
 
                 _logger.LogInformation($"📊 Found {topServices.Count} services with Service assigned");
 
-                // Ako nema termina sa uslugom, grupiši po TIPU termina
+                // Ako iz bilo kog razloga i dalje prazno, kao fallback grupiši po tipu
                 if (topServices.Count == 0)
                 {
-                    _logger.LogInformation($"🔄 No services found, grouping by appointment type...");
-                    
-                    topServices = await _context.Appointments
-                        .Where(a => a.VeterinarianId == veterinarianId && 
-                                   a.Status == AppointmentStatus.Completed)
-                        .GroupBy(a => a.Type)
+                    _logger.LogInformation($"🔄 No categorized data, fallback by type...");
+                    topServices = rawItems
+                        .GroupBy(a => MapType(a.Type))
                         .Select(g => new RevenueByService
                         {
-                            ServiceName = g.Key == AppointmentType.Checkup ? "Pregled" :
-                                         g.Key == AppointmentType.Vaccination ? "Vakcinacija" :
-                                         g.Key == AppointmentType.Surgery ? "Operacija" :
-                                         g.Key == AppointmentType.Emergency ? "Hitno" :
-                                         g.Key == AppointmentType.Grooming ? "Šišanje/Njega" :
-                                         g.Key == AppointmentType.Dental ? "Stomatologija" :
-                                         g.Key == AppointmentType.Consultation ? "Konsultacija" :
-                                         g.Key == AppointmentType.FollowUp ? "Kontrola" : "Ostalo",
-                            Revenue = g.Sum(a => a.ActualCost ?? 0),
+                            ServiceName = g.Key,
+                            Revenue = g.Sum(a => a.Amount),
                             Count = g.Count()
                         })
                         .OrderByDescending(r => r.Revenue)
                         .Take(5)
-                        .ToListAsync();
-                    
-                    _logger.LogInformation($"📊 Found {topServices.Count} appointment types");
+                        .ToList();
+                }
+                
+                // Ako postoji lista ali je ukupan prihod 0 (nema evidentiranih cijena),
+                // koristi broj termina kao težinu da bi pie-chart bio šaren (umjesto 100% jedne kategorije)
+                if (topServices.Count > 0 && topServices.Sum(s => s.Revenue) == 0)
+                {
+                    _logger.LogInformation("🔄 Total revenue is 0 for vet {VeterinarianId}, using counts as weights", veterinarianId);
+                    topServices = topServices
+                        .Select(s => new RevenueByService
+                        {
+                            ServiceName = s.ServiceName,
+                            Revenue = s.Count, // koristi count kao pseudo-prihod
+                            Count = s.Count
+                        })
+                        .ToList();
                 }
                 
                 // Ako JOŠ UVIJEK nema, onda prikaži SVE termine (bilo koji status)

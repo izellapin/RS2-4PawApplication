@@ -282,7 +282,15 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              // TODO: Implement profile update API call
+              final authService = Provider.of<AuthService>(context, listen: false);
+              try {
+                await authService.updateProfile(
+                  firstName: firstNameController.text.trim(),
+                  lastName: lastNameController.text.trim(),
+                  phoneNumber: phoneController.text.trim().isEmpty ? null : phoneController.text.trim(),
+                  address: addressController.text.trim().isEmpty ? null : addressController.text.trim(),
+                );
+                if (mounted) {
               Navigator.of(context).pop();
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
@@ -290,6 +298,17 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
                   backgroundColor: Colors.green,
                 ),
               );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Greška pri ažuriranju: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
             },
             child: const Text('Sačuvaj'),
           ),

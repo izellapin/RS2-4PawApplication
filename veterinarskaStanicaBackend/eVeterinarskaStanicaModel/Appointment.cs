@@ -59,6 +59,17 @@ namespace eVeterinarskaStanicaModel
         [Column(TypeName = "decimal(18,2)")]
         public decimal? ActualCost { get; set; }
 
+        // Payment tracking
+        public bool IsPaid { get; set; } = false;
+        
+        public DateTime? PaymentDate { get; set; }
+        
+        [StringLength(100)]
+        public string? PaymentMethod { get; set; } // "Stripe", "Cash", "Card", etc.
+        
+        [StringLength(100)]
+        public string? PaymentTransactionId { get; set; } // Stripe payment intent ID
+
         public DateTime DateCreated { get; set; } = DateTime.UtcNow;
 
         public DateTime? DateModified { get; set; }

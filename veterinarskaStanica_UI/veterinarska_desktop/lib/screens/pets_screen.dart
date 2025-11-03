@@ -60,7 +60,6 @@ class _PetsScreenState extends State<PetsScreen> {
     } catch (e) {
       print('❌ Error loading pets: $e');
       
-      // Check if it's an authentication error
       if (e.toString().contains('401') || e.toString().contains('Unauthorized')) {
         setState(() {
           _error = 'Niste ulogovani. Molimo prijavite se ponovo.';
