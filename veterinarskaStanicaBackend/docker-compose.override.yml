@@ -19,6 +19,8 @@ services:
     ports:
       - "5160:5160"
     volumes:
+      - ${HOME}/.microsoft/usersecrets:/home/dotnet/.microsoft/usersecrets:ro
+      - ${HOME}/.nuget/packages:/home/dotnet/.nuget/packages:ro
       - ${APPDATA}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
       - ./veterinarskaStanica.WebAPI:/app/source:ro
       - veterinary_logs_dev:/app/logs

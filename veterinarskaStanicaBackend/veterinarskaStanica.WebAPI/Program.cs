@@ -102,6 +102,31 @@ namespace veterinarskaStanica.WebAPI
                     return !apiDesc.ActionDescriptor.RouteValues.ContainsKey("controller") ||
                            apiDesc.ActionDescriptor.RouteValues["controller"] != "Error";
                 });
+
+                // JWT Bearer security so the "Authorize" button appears in Swagger UI
+                // Define JWT as ApiKey to ensure the Authorize button shows up across Swagger UI versions
+                c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+                {
+                    Description = "JWT Authorization header. Format: Bearer {token}",
+                    Name = "Authorization",
+                    In = ParameterLocation.Header,
+                    Type = SecuritySchemeType.ApiKey
+                });
+
+                c.AddSecurityRequirement(new OpenApiSecurityRequirement
+                {
+                    {
+                        new OpenApiSecurityScheme
+                        {
+                            Reference = new OpenApiReference
+                            {
+                                Type = ReferenceType.SecurityScheme,
+                                Id = "Bearer"
+                            }
+                        },
+                        Array.Empty<string>()
+                    }
+                });
             });
 
             // ===== Health checks =====
