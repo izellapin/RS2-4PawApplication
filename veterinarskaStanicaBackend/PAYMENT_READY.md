@@ -132,3 +132,4 @@ curl -X PATCH http://localhost:5160/api/appointments/1/mark-paid \
 
 
 
+
